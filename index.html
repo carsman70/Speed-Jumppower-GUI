@@ -1,11 +1,15 @@
--- Version 3: Delayed Initialization
+-- Version 2: Loop-based Initialization
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
-wait(0.5)  -- small delay before setup
+-- Loop until PlayerGui exists (retry logic)
+local playerGui = player:FindFirstChild("PlayerGui")
+while not playerGui do
+    wait(0.1)
+    playerGui = player:FindFirstChild("PlayerGui")
+end
 
-local playerGui = player:WaitForChild("PlayerGui")
-
+-- The rest is the same UI setup as Version 1:
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CustomGUI"
 screenGui.Parent = playerGui
@@ -160,4 +164,4 @@ revertBtn.Font = Enum.Font.SourceSansBold
 revertBtn.TextSize = 18
 revertBtn.Parent = contentFrame
 
--- (TweenService, sliders logic, and fade are identical to Version 1)
+-- (TweenService, initial values, update functions, dragging logic, and fade logic same as above)
