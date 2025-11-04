@@ -1,6 +1,4 @@
--- DiscordPopupWithSliders (LocalScript)
--- Place this LocalScript in StarterPlayerScripts
-
+-- StarterPlayerScripts LocalScript
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -10,371 +8,139 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- Config
-local DISCORD_URL = "https://discord.gg/aeUzHJJd5"
-local STICKER_ASSET = "rbxassetid://INSERT_IMAGE_ID" -- optional: replace or set to "" to use default emoji
-local FRAME_SIZE = UDim2.new(0, 320, 0, 150)
+local DISCORD_URL = "https://discord.gg/Gq2nNUac4"
+local STICKER_ASSET = "rbxassetid://INSERT_IMAGE_ID" -- optional small squircle Discord icon
+local FRAME_SIZE = UDim2.new(0, 320, 0, 180)
 local MINIMIZED_SIZE = UDim2.new(0, 320, 0, 36)
-local BG_COLOR = Color3.fromRGB(55, 57, 61)
-local TITLE_COLOR = Color3.fromRGB(45, 47, 50)
-
-local TWEEN_IN = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local BG_COLOR = Color3.fromRGB(0,0,0)
+local BG_TRANSPARENCY = 0.2
+local TITLE_COLOR = Color3.fromRGB(30,30,30)
+local SLIDER_COLOR = Color3.fromRGB(150,150,150)
 local TWEEN_POP = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local TWEEN_OUT = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
--- Utility: create UI objects
+-- Utility function
 local function new(className, props)
-	local obj = Instance.new(className)
-	if props then
-		for k,v in pairs(props) do
-			obj[k] = v
-		end
-	end
-	return obj
+    local obj = Instance.new(className)
+    if props then
+        for k,v in pairs(props) do obj[k] = v end
+    end
+    return obj
 end
 
--- Build ScreenGui
-local screenGui = new("ScreenGui", { Name = "DiscordPopupGui", ResetOnSpawn = false })
+-- ScreenGui
+local screenGui = new("ScreenGui",{Name="LuxuryGUI", ResetOnSpawn=false})
 screenGui.Parent = playerGui
 
 -- Main frame
-local frame = new("Frame", {
-	Name = "PopupFrame",
-	Size = FRAME_SIZE,
-	Position = UDim2.new(0.5, 0, 0.4, 0),
-	AnchorPoint = Vector2.new(0.5, 0.5),
-	BackgroundColor3 = BG_COLOR,
-	BorderSizePixel = 0,
-	ClipsDescendants = true,
-	Visible = false,
-	BackgroundTransparency = 1
+local frame = new("Frame",{
+    Name="PopupFrame",
+    Size=FRAME_SIZE,
+    Position=UDim2.new(0.5,0,0.4,0),
+    AnchorPoint=Vector2.new(0.5,0.5),
+    BackgroundColor3=BG_COLOR,
+    BackgroundTransparency=1,
+    BorderSizePixel=0,
+    ClipsDescendants=true,
+    Visible=false
 })
 frame.Parent = screenGui
-new("UICorner", { CornerRadius = UDim.new(0,14), Parent = frame })
+new("UICorner",{CornerRadius=UDim.new(0,6),Parent=frame})
 
 -- Titlebar
-local titleBar = new("Frame", {
-	Name = "TitleBar",
-	Size = UDim2.new(1,0,0,36),
-	Position = UDim2.new(0,0,0,0),
-	BackgroundColor3 = TITLE_COLOR,
-	BorderSizePixel = 0,
-	Parent = frame
-})
-new("UICorner", { CornerRadius = UDim.new(0,14), Parent = titleBar })
+local titleBar = new("Frame",{Name="TitleBar",Size=UDim2.new(1,0,0,36),BackgroundColor3=TITLE_COLOR,BorderSizePixel=0,Parent=frame})
+new("UICorner",{CornerRadius=UDim.new(0,6),Parent=titleBar})
 
-local titleLabel = new("TextLabel", {
-	Name = "Title",
-	Size = UDim2.new(1, -100, 1, 0),
-	Position = UDim2.new(0, 12, 0, 0),
-	BackgroundTransparency = 1,
-	Text = "Discord",
-	TextColor3 = Color3.new(1,1,1),
-	TextScaled = true,
-	Font = Enum.Font.GothamSemibold,
-	Parent = titleBar
-})
+-- Title
+local titleLabel = new("TextLabel",{Text="Luxury GUI",Font=Enum.Font.GothamBold,TextSize=18,TextColor3=Color3.new(1,1,1),BackgroundTransparency=1,Size=UDim2.new(0.6,0,1,0),Parent=titleBar})
 
-local closeBtn = new("TextButton", {
-	Name = "Close",
-	Size = UDim2.new(0,28,0,28),
-	Position = UDim2.new(1, -36, 0, 4),
-	BackgroundColor3 = Color3.fromRGB(170,40,40),
-	Text = "X",
-	TextColor3 = Color3.new(1,1,1),
-	Font = Enum.Font.GothamBold,
-	TextSize = 18,
-	BorderSizePixel = 0,
-	AutoButtonColor = true,
-	Parent = titleBar
-})
-new("UICorner", { CornerRadius = UDim.new(0,6), Parent = closeBtn })
+-- Close & Minimize
+local closeBtn = new("TextButton",{Text="X",Font=Enum.Font.GothamBold,TextSize=18,TextColor3=Color3.new(1,1,1),BackgroundColor3=Color3.fromRGB(170,40,40),Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,-36,0,4),BorderSizePixel=0,AutoButtonColor=true,Parent=titleBar})
+new("UICorner",{CornerRadius=UDim.new(0,6),Parent=closeBtn})
 
-local minBtn = new("TextButton", {
-	Name = "Minimize",
-	Size = UDim2.new(0,28,0,28),
-	Position = UDim2.new(1, -70, 0, 4),
-	BackgroundColor3 = Color3.fromRGB(120,120,120),
-	Text = "—",
-	TextColor3 = Color3.new(1,1,1),
-	Font = Enum.Font.GothamBold,
-	TextSize = 18,
-	BorderSizePixel = 0,
-	AutoButtonColor = true,
-	Parent = titleBar
-})
-new("UICorner", { CornerRadius = UDim.new(0,6), Parent = minBtn })
+local minBtn = new("TextButton",{Text="—",Font=Enum.Font.GothamBold,TextSize=18,TextColor3=Color3.new(1,1,1),BackgroundColor3=Color3.fromRGB(80,80,80),Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,-70,0,4),BorderSizePixel=0,AutoButtonColor=true,Parent=titleBar})
+new("UICorner",{CornerRadius=UDim.new(0,6),Parent=minBtn})
 
--- Body container
-local body = new("Frame", {
-	Name = "Body",
-	Size = UDim2.new(1,0,1,-36),
-	Position = UDim2.new(0,0,0,36),
-	BackgroundTransparency = 1,
-	Parent = frame
+-- Discord Button (opposite side)
+local discordBtn = new("ImageButton",{
+    Size=UDim2.new(0,28,0,28),
+    Position=UDim2.new(1,-104,0,4),
+    BackgroundTransparency=1,
+    Image=STICKER_ASSET or "rbxasset://textures/ui/GuiImagePlaceholder.png",
+    Parent=titleBar,
+    AutoButtonColor=true
 })
+new("UICorner",{CornerRadius=UDim.new(0,6),Parent=discordBtn})
+discordBtn.MouseButton1Click:Connect(function()
+    pcall(function() GuiService:OpenBrowserWindow(DISCORD_URL) end)
+end)
 
--- Sticker
-local sticker = new("ImageButton", {
-	Name = "Sticker",
-	Size = UDim2.new(0,56,0,56),
-	Position = UDim2.new(0,12,0,12),
-	BackgroundTransparency = 1,
-	AutoButtonColor = true,
-	Parent = body
-})
-if STICKER_ASSET and STICKER_ASSET ~= "" then
-	sticker.Image = STICKER_ASSET
-else
-	-- default discord icon (roblox-safe emoji)
-	sticker.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+-- Body frame
+local body = new("Frame",{Size=UDim2.new(1,0,1,-36),Position=UDim2.new(0,0,0,36),BackgroundTransparency=1,Parent=frame})
+
+-- Slider utility
+local function createSlider(parent, yOffset, labelText, default)
+    local wrapper = new("Frame",{Size=UDim2.new(1,-24,0,34),Position=UDim2.new(0,12,0,yOffset),BackgroundTransparency=1,Parent=parent})
+    local label = new("TextLabel",{Size=UDim2.new(0.5,0,1,0),BackgroundTransparency=1,Text=labelText,TextColor3=Color3.new(1,1,1),Font=Enum.Font.Gotham,TextSize=16,TextXAlignment=Enum.TextXAlignment.Left,Parent=wrapper})
+    local valLabel = new("TextLabel",{Size=UDim2.new(0.4,0,1,0),Position=UDim2.new(0.6,0,0,0),BackgroundTransparency=1,Text=tostring(default),TextColor3=Color3.new(1,1,1),Font=Enum.Font.Gotham,TextSize=16,TextXAlignment=Enum.TextXAlignment.Right,Parent=wrapper})
+    local track = new("Frame",{Size=UDim2.new(1,0,0,8),Position=UDim2.new(0,0,1,-10),BackgroundColor3=SLIDER_COLOR,BorderSizePixel=0,Parent=wrapper})
+    new("UICorner",{CornerRadius=UDim.new(0,4),Parent=track})
+    local fill = new("Frame",{Size=UDim2.new(default/1000,0,1,0),BackgroundColor3=Color3.fromRGB(200,200,200),BorderSizePixel=0,Parent=track})
+    new("UICorner",{CornerRadius=UDim.new(0,4),Parent=fill})
+    local knob = new("ImageButton",{Size=UDim2.new(0,18,0,18),Position=UDim2.new(default/1000,-9,0.5,-9),BackgroundColor3=Color3.fromRGB(230,230,230),BorderSizePixel=0,Parent=track,AutoButtonColor=true})
+    new("UICorner",{CornerRadius=UDim.new(0,9),Parent=knob})
+
+    local slider = {Wrapper=wrapper,Track=track,Fill=fill,Knob=knob,Label=label,ValueLabel=valLabel,Value=default,Dragging=false}
+    local function updateFromX(x)
+        local rectX = slider.Track.AbsolutePosition.X
+        local width = slider.Track.AbsoluteSize.X
+        local rel = math.clamp((x-rectX)/math.max(1,width),0,1)
+        local value = rel * 1000
+        local snapped = math.floor((value + 5) / 10) * 10  -- snap every 10
+        slider.Value = snapped
+        slider.ValueLabel.Text = tostring(snapped)
+        slider.Fill.Size = UDim2.new(snapped/1000,0,1,0)
+        slider.Knob.Position = UDim2.new(snapped/1000,-9,0.5,-9)
+    end
+
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+            slider.Dragging=true; updateFromX(input.Position.X)
+        end
+    end)
+    knob.InputChanged:Connect(function(input)
+        if slider.Dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then updateFromX(input.Position.X) end
+    end)
+    knob.InputEnded:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then slider.Dragging=false end
+    end)
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then updateFromX(input.Position.X) end
+    end)
+
+    return slider
 end
 
-local bodyLabel = new("TextLabel", {
-	Name = "BodyLabel",
-	Size = UDim2.new(1, -96, 0, 40),
-	Position = UDim2.new(0,84,0,14),
-	BackgroundTransparency = 1,
-	Text = "Join our Discord",
-	TextColor3 = Color3.new(1,1,1),
-	Font = Enum.Font.Gotham,
-	TextSize = 18,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	Parent = body
-})
+-- Create sliders
+local speedSlider = createSlider(body,12,"Speed",16)
+local jumpSlider = createSlider(body,56,"JumpPower",50)
 
--- Slider creator (0..1000)
-local function createSlider(parent, yOffset, name, initial)
-	local wrapper = new("Frame", { Size = UDim2.new(1, -24, 0, 34), Position = UDim2.new(0,12,0,yOffset), BackgroundTransparency = 1, Parent = parent })
-	local label = new("TextLabel", { Name = "Label", Size = UDim2.new(0.5,0,1,0), BackgroundTransparency = 1, Text = name, TextColor3 = Color3.new(1,1,1), Font = Enum.Font.Gotham, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left, Parent = wrapper })
-	local valLabel = new("TextLabel", { Name = "Value", Size = UDim2.new(0.4,0,1,0), Position = UDim2.new(0.6,0,0,0), BackgroundTransparency = 1, Text = tostring(initial), TextColor3 = Color3.new(1,1,1), Font = Enum.Font.Gotham, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Right, Parent = wrapper })
-
-	local track = new("Frame", { Name = "Track", Size = UDim2.new(1,0,0,8), Position = UDim2.new(0,0,1,-10), BackgroundColor3 = Color3.fromRGB(80,80,80), BorderSizePixel = 0, Parent = wrapper })
-	new("UICorner", { CornerRadius = UDim.new(0,8), Parent = track })
-
-	local fill = new("Frame", { Name = "Fill", Size = UDim2.new(math.clamp(initial/1000,0,1),0,1,0), BackgroundColor3 = Color3.fromRGB(100,200,255), BorderSizePixel = 0, Parent = track })
-	new("UICorner", { CornerRadius = UDim.new(0,8), Parent = fill })
-
-	local knob = new("ImageButton", { Name = "Knob", Size = UDim2.new(0,18,0,18), Position = UDim2.new(math.clamp(initial/1000,0,1), -9, 0.5, -9), BackgroundColor3 = Color3.fromRGB(230,230,230), BorderSizePixel = 0, Parent = track })
-	new("UICorner", { CornerRadius = UDim.new(0,9), Parent = knob })
-
-	local slider = {
-		Wrapper = wrapper,
-		Track = track,
-		Fill = fill,
-		Knob = knob,
-		Label = label,
-		ValueLabel = valLabel,
-		Value = initial,
-		Dragging = false,
-		TrackPixel = 0
-	}
-
-	-- update helper
-	local function updateFromX(x)
-		local rectX = slider.Track.AbsolutePosition.X
-		slider.TrackPixel = slider.Track.AbsoluteSize.X
-		local rel = math.clamp((x - rectX) / math.max(1, slider.TrackPixel), 0, 1)
-		local value = math.floor(rel * 1000 + 0.5)
-		slider.Value = value
-		slider.ValueLabel.Text = tostring(value)
-		slider.Fill.Size = UDim2.new(rel, 0, 1, 0)
-		slider.Knob.Position = UDim2.new(rel, -9, 0.5, -9)
-	end
-
-	knob.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			slider.Dragging = true
-			updateFromX(input.Position.X)
-		end
-	end)
-	knob.InputChanged:Connect(function(input)
-		if slider.Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			updateFromX(input.Position.X)
-		end
-	end)
-	knob.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			slider.Dragging = false
-		end
-	end)
-
-	track.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			updateFromX(input.Position.X)
-		end
-	end)
-
-	-- ensure AbsoluteSize exists
-	track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-		slider.TrackPixel = track.AbsoluteSize.X
-	end)
-
-	return slider
-end
-
-local speedSlider = createSlider(body, 12, "Speed", 16)
-local jumpSlider = createSlider(body, 56, "JumpPower", 50)
-
--- Apply values to humanoid safely (clamped 0..1000)
-local function applyToCharacter()
-	local char = player.Character
-	if not char then return end
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		local speed = math.clamp(speedSlider.Value or 16, 0, 1000)
-		local jumpP = math.clamp(jumpSlider.Value or 50, 0, 1000)
-		-- Use WalkSpeed and JumpPower
-		humanoid.WalkSpeed = speed
-		-- Some Roblox versions use JumpPower, others use JumpHeight; JumpPower is requested by user
-		pcall(function() humanoid.JumpPower = jumpP end)
-		-- fallback to JumpHeight if JumpPower unavailable (keeps behavior predictable)
-		if humanoid.JumpPower == nil then
-			-- convert approximate JumpPower -> JumpHeight (simple fallback)
-			local height = math.max(0, jumpP / 50) -- heuristic
-			pcall(function() humanoid.JumpHeight = height end)
-		end
-	end
-end
-
--- keep applying while GUI exists (live update)
+-- Apply values smoothly
 local running = true
 spawn(function()
-	while running do
-		applyToCharacter()
-		task.wait(0.12)
-	end
+    while running do
+        local char = player.Character
+        if char then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = math.clamp(speedSlider.Value,0,1000)
+                humanoid.JumpPower = math.clamp(jumpSlider.Value,0,1000)
+            end
+        end
+        task.wait(0.05)
+    end
 end)
+player.CharacterAdded:Connect(function() task.wait(0.1) end)
 
-player.CharacterAdded:Connect(function()
-	task.wait(0.4)
-	applyToCharacter()
-end)
-
--- Sticker click opens Discord invite
-sticker.MouseButton1Click:Connect(function()
-	pcall(function()
-		GuiService:OpenBrowserWindow(DISCORD_URL)
-	end)
-end)
-
--- Dragging implementation for titlebar
-do
-	local dragging, dragStart, startPos, dragInput
-	titleBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = frame.Position
-			dragInput = input
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
-			end)
-		end
-	end)
-	titleBar.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement then
-			dragInput = input
-		end
-	end)
-	UserInputService.InputChanged:Connect(function(input)
-		if dragging and input == dragInput then
-			local delta = input.Position - dragStart
-			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-end
-
--- Minimize behavior
-local minimized = false
-minBtn.MouseButton1Click:Connect(function()
-	if minimized then
-		minimized = false
-		TweenService:Create(frame, TWEEN_POP, { Size = FRAME_SIZE }):Play()
-		-- show body children
-		for _,v in ipairs(body:GetDescendants()) do
-			if v:IsA("GuiObject") then v.Visible = true end
-		end
-	else
-		minimized = true
-		TweenService:Create(frame, TWEEN_OUT, { Size = MINIMIZED_SIZE }):Play()
-		task.delay(0.18, function()
-			for _,v in ipairs(body:GetDescendants()) do
-				if v:IsA("GuiObject") then v.Visible = false end
-			end
-		end)
-	end
-end)
-
--- Close behavior: fade out then destroy
-closeBtn.MouseButton1Click:Connect(function()
-	local tweens = {}
-	for _, child in ipairs(frame:GetDescendants()) do
-		if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("ImageLabel") or child:IsA("ImageButton") or child:IsA("Frame") then
-			if child:IsA("TextLabel") or child:IsA("TextButton") then
-				table.insert(tweens, TweenService:Create(child, TWEEN_OUT, { TextTransparency = 1, BackgroundTransparency = 1 }))
-			elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
-				table.insert(tweens, TweenService:Create(child, TWEEN_OUT, { ImageTransparency = 1, BackgroundTransparency = 1 }))
-			elseif child:IsA("Frame") then
-				table.insert(tweens, TweenService:Create(child, TWEEN_OUT, { BackgroundTransparency = 1 }))
-			end
-		end
-	end
-	local mainFade = TweenService:Create(frame, TWEEN_OUT, { BackgroundTransparency = 1 })
-	mainFade:Play()
-	for _,t in ipairs(tweens) do t:Play() end
-	task.wait(0.4)
-	running = false
-	screenGui:Destroy()
-end)
-
--- Fade-in show (pop + fade)
-local function showPopup()
-	-- prepare initial transparencies
-	frame.Visible = true
-	for _, child in ipairs(frame:GetDescendants()) do
-		if child:IsA("TextLabel") or child:IsA("TextButton") then
-			child.TextTransparency = 1
-			if child.BackgroundTransparency ~= nil then child.BackgroundTransparency = 1 end
-		elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
-			child.ImageTransparency = 1
-			if child.BackgroundTransparency ~= nil then child.BackgroundTransparency = 1 end
-		elseif child:IsA("Frame") then
-			if child.BackgroundTransparency ~= nil then child.BackgroundTransparency = 1 end
-		end
-	end
-
-	-- pop scale effect (size change) and reveal frame BG
-	frame.Size = UDim2.new(0, 280, 0, 130)
-	local t = TweenService:Create(frame, TWEEN_POP, { Size = FRAME_SIZE, BackgroundTransparency = 0 })
-	t:Play()
-
-	-- stagger reveal of children
-	task.delay(0.08, function()
-		for _, child in ipairs(frame:GetDescendants()) do
-			if child:IsA("TextLabel") or child:IsA("TextButton") then
-				TweenService:Create(child, TWEEN_IN, { TextTransparency = 0, BackgroundTransparency = 0 }):Play()
-			elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
-				TweenService:Create(child, TWEEN_IN, { ImageTransparency = 0, BackgroundTransparency = 0 }):Play()
-			elseif child:IsA("Frame") then
-				TweenService:Create(child, TWEEN_IN, { BackgroundTransparency = 0 }):Play()
-			end
-		end
-	end)
-end
-
--- Ensure knob positions after layout, then show
-task.wait(0.05)
-speedSlider.Track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-	local rel = math.clamp(speedSlider.Value/1000, 0, 1)
-	speedSlider.Fill.Size = UDim2.new(rel, 0, 1, 0)
-	speedSlider.Knob.Position = UDim2.new(rel, -9, 0.5, -9)
-end)
-jumpSlider.Track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-	local rel = math.clamp(jumpSlider.Value/1000, 0, 1)
-	jumpSlider.Fill.Size = UDim2.new(rel, 0, 1, 0)
-	jumpSlider.Knob.Position = UDim2.new(rel, -9, 0.5, -9)
-end)
-
-task.delay(0.2, showPopup)
+-- Revert button
+local revertBtn = new("
