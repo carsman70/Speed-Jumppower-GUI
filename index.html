@@ -1,224 +1,380 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Discord Popup</title>
-<style>
-  :root{
-    --bg:#0f1113;
-    --frame:#37393b;
-    --title:#2d2f32;
-    --accent:#64c8ff;
-    --muted:#bfc3c7;
-    --danger:#aa2828;
-  }
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0d 0%, #111315 100%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
-  /* center */
-  .stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
-  /* squircle container */
-  .card{
-    width:320px;height:150px;border-radius:20px;background:var(--frame);box-shadow:0 8px 30px rgba(0,0,0,.6);position:relative;overflow:hidden;
-    transform-origin:center center;opacity:0;transform:scale(.92) translateY(6px);
-    transition:opacity .45s cubic-bezier(.22,.9,.27,1), transform .35s cubic-bezier(.22,.9,.27,1);
-  }
-  .card.visible{opacity:1;transform:scale(1) translateY(0);}
-  .titlebar{height:36px;background:var(--title);display:flex;align-items:center;padding:0 10px;gap:8px;}
-  .title{flex:1;color:white;font-weight:600;font-size:14px}
-  .btn{width:28px;height:28px;border-radius:6px;border:0;color:white;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
-  .close{background:var(--danger)}
-  .min{background:#787878}
-  .body{display:flex;gap:12px;padding:12px;align-items:flex-start}
-  .sticker{width:56px;height:56px;border-radius:12px;background:#0b0c0d;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;flex:0 0 56px}
-  .sticker img{width:100%;height:100%;object-fit:cover;display:block}
-  .content{flex:1;color:var(--muted)}
-  .content h3{margin:0;font-size:16px;color:white;margin-bottom:6px}
-  .row{display:flex;align-items:center;gap:8px;margin-top:8px}
-  .track{height:8px;background:#505050;border-radius:8px;position:relative;flex:1;cursor:pointer}
-  .fill{height:100%;background:var(--accent);width:20%;border-radius:8px}
-  .knob{width:18px;height:18px;border-radius:9px;background:#e9eef2;border:2px solid rgba(0,0,0,.1);position:absolute;top:50%;transform:translateY(-50%);left:0;touch-action:none}
-  .label{font-size:12px;color:#d7d9db;min-width:62px;text-align:left}
-  .value{font-weight:700;color:white;min-width:44px;text-align:right}
-  /* minimized state */
-  .card.minimized{height:36px;width:320px}
-  .card.minimized .body{display:none}
-  /* drag cursor */
-  .titlebar:active{cursor:grabbing}
-  /* small X for closed state */
-  @media (max-width:400px){
-    .card{width:94%}
-  }
-</style>
-</head>
-<body>
-  <div class="stage">
-    <div id="card" class="card" role="dialog" aria-label="Discord Popup">
-      <div id="titlebar" class="titlebar">
-        <div class="title">Discord</div>
-        <button id="minBtn" class="btn min" title="Minimize">—</button>
-        <button id="closeBtn" class="btn close" title="Close">✕</button>
-      </div>
+-- DiscordPopupWithSliders (LocalScript)
+-- Place this LocalScript in StarterPlayerScripts
 
-      <div class="body">
-        <button id="sticker" class="sticker" title="Open Discord (opens in new tab)">
-          <!-- Replace src with any image url or a GitHub raw link to an image -->
-          <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" alt="Discord">
-        </button>
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 
-        <div class="content">
-          <h3>Join our Discord</h3>
-          <div style="color:#bfc3c7;font-size:13px">Click the sticker to open the invite link.</div>
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-          <div class="row" style="margin-top:12px">
-            <div class="label">Speed</div>
-            <div class="track" id="speedTrack" data-value="16">
-              <div class="fill" id="speedFill" style="width:1.6%"></div>
-              <div class="knob" id="speedKnob" style="left:1.6%"></div>
-            </div>
-            <div class="value" id="speedVal">16</div>
-          </div>
+-- Config
+local DISCORD_URL = "https://discord.gg/aeUzHJJd5"
+local STICKER_ASSET = "rbxassetid://INSERT_IMAGE_ID" -- optional: replace or set to "" to use default emoji
+local FRAME_SIZE = UDim2.new(0, 320, 0, 150)
+local MINIMIZED_SIZE = UDim2.new(0, 320, 0, 36)
+local BG_COLOR = Color3.fromRGB(55, 57, 61)
+local TITLE_COLOR = Color3.fromRGB(45, 47, 50)
 
-          <div class="row">
-            <div class="label">JumpPower</div>
-            <div class="track" id="jumpTrack" data-value="50">
-              <div class="fill" id="jumpFill" style="width:5%"></div>
-              <div class="knob" id="jumpKnob" style="left:5%"></div>
-            </div>
-            <div class="value" id="jumpVal">50</div>
-          </div>
+local TWEEN_IN = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local TWEEN_POP = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local TWEEN_OUT = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-        </div>
-      </div>
-    </div>
-  </div>
+-- Utility: create UI objects
+local function new(className, props)
+	local obj = Instance.new(className)
+	if props then
+		for k,v in pairs(props) do
+			obj[k] = v
+		end
+	end
+	return obj
+end
 
-<script>
-  (function(){
-    const DISCORD = "https://discord.gg/aeUzHJJd5";
-    const card = document.getElementById('card');
-    const sticker = document.getElementById('sticker');
-    const closeBtn = document.getElementById('closeBtn');
-    const minBtn = document.getElementById('minBtn');
-    const titlebar = document.getElementById('titlebar');
+-- Build ScreenGui
+local screenGui = new("ScreenGui", { Name = "DiscordPopupGui", ResetOnSpawn = false })
+screenGui.Parent = playerGui
 
-    // sliders
-    function setupSlider(trackId, fillId, knobId, valueId, initial){
-      const track = document.getElementById(trackId);
-      const fill = document.getElementById(fillId);
-      const knob = document.getElementById(knobId);
-      const val = document.getElementById(valueId);
-      let dragging = false;
-      let width = 0;
+-- Main frame
+local frame = new("Frame", {
+	Name = "PopupFrame",
+	Size = FRAME_SIZE,
+	Position = UDim2.new(0.5, 0, 0.4, 0),
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	BackgroundColor3 = BG_COLOR,
+	BorderSizePixel = 0,
+	ClipsDescendants = true,
+	Visible = false,
+	BackgroundTransparency = 1
+})
+frame.Parent = screenGui
+new("UICorner", { CornerRadius = UDim.new(0,14), Parent = frame })
 
-      function pctToValue(pct){ return Math.round(pct * 1000); }
-      function valueToPct(v){ return Math.max(0, Math.min(1, v/1000)); }
+-- Titlebar
+local titleBar = new("Frame", {
+	Name = "TitleBar",
+	Size = UDim2.new(1,0,0,36),
+	Position = UDim2.new(0,0,0,0),
+	BackgroundColor3 = TITLE_COLOR,
+	BorderSizePixel = 0,
+	Parent = frame
+})
+new("UICorner", { CornerRadius = UDim.new(0,14), Parent = titleBar })
 
-      function updatePosFromClientX(clientX){
-        const rect = track.getBoundingClientRect();
-        width = rect.width;
-        let rel = (clientX - rect.left)/width;
-        rel = Math.max(0, Math.min(1, rel));
-        fill.style.width = (rel*100) + "%";
-        knob.style.left = (rel*100) + "%";
-        const value = pctToValue(rel);
-        val.textContent = value;
-        track.dataset.value = value;
-        // custom event: sliderchanged
-        track.dispatchEvent(new CustomEvent('sliderchanged',{detail:{value}}));
-      }
+local titleLabel = new("TextLabel", {
+	Name = "Title",
+	Size = UDim2.new(1, -100, 1, 0),
+	Position = UDim2.new(0, 12, 0, 0),
+	BackgroundTransparency = 1,
+	Text = "Discord",
+	TextColor3 = Color3.new(1,1,1),
+	TextScaled = true,
+	Font = Enum.Font.GothamSemibold,
+	Parent = titleBar
+})
 
-      knob.addEventListener('mousedown', (e)=>{ dragging = true; e.preventDefault(); updatePosFromClientX(e.clientX); });
-      window.addEventListener('mouseup', ()=>{ dragging = false; });
-      window.addEventListener('mousemove', (e)=>{ if(dragging) updatePosFromClientX(e.clientX); });
+local closeBtn = new("TextButton", {
+	Name = "Close",
+	Size = UDim2.new(0,28,0,28),
+	Position = UDim2.new(1, -36, 0, 4),
+	BackgroundColor3 = Color3.fromRGB(170,40,40),
+	Text = "X",
+	TextColor3 = Color3.new(1,1,1),
+	Font = Enum.Font.GothamBold,
+	TextSize = 18,
+	BorderSizePixel = 0,
+	AutoButtonColor = true,
+	Parent = titleBar
+})
+new("UICorner", { CornerRadius = UDim.new(0,6), Parent = closeBtn })
 
-      // touch
-      knob.addEventListener('touchstart',(e)=>{ dragging = true; updatePosFromClientX(e.touches[0].clientX); }, {passive:false});
-      window.addEventListener('touchend', ()=>{ dragging = false; });
-      window.addEventListener('touchmove', (e)=>{ if(dragging) updatePosFromClientX(e.touches[0].clientX); }, {passive:false});
+local minBtn = new("TextButton", {
+	Name = "Minimize",
+	Size = UDim2.new(0,28,0,28),
+	Position = UDim2.new(1, -70, 0, 4),
+	BackgroundColor3 = Color3.fromRGB(120,120,120),
+	Text = "—",
+	TextColor3 = Color3.new(1,1,1),
+	Font = Enum.Font.GothamBold,
+	TextSize = 18,
+	BorderSizePixel = 0,
+	AutoButtonColor = true,
+	Parent = titleBar
+})
+new("UICorner", { CornerRadius = UDim.new(0,6), Parent = minBtn })
 
-      // clicking track
-      track.addEventListener('click', (e)=> updatePosFromClientX(e.clientX));
+-- Body container
+local body = new("Frame", {
+	Name = "Body",
+	Size = UDim2.new(1,0,1,-36),
+	Position = UDim2.new(0,0,0,36),
+	BackgroundTransparency = 1,
+	Parent = frame
+})
 
-      // init
-      const pct = valueToPct(initial);
-      fill.style.width = (pct*100) + "%";
-      knob.style.left = (pct*100) + "%";
-      val.textContent = initial;
-      track.dataset.value = initial;
+-- Sticker
+local sticker = new("ImageButton", {
+	Name = "Sticker",
+	Size = UDim2.new(0,56,0,56),
+	Position = UDim2.new(0,12,0,12),
+	BackgroundTransparency = 1,
+	AutoButtonColor = true,
+	Parent = body
+})
+if STICKER_ASSET and STICKER_ASSET ~= "" then
+	sticker.Image = STICKER_ASSET
+else
+	-- default discord icon (roblox-safe emoji)
+	sticker.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+end
 
-      return track;
-    }
+local bodyLabel = new("TextLabel", {
+	Name = "BodyLabel",
+	Size = UDim2.new(1, -96, 0, 40),
+	Position = UDim2.new(0,84,0,14),
+	BackgroundTransparency = 1,
+	Text = "Join our Discord",
+	TextColor3 = Color3.new(1,1,1),
+	Font = Enum.Font.Gotham,
+	TextSize = 18,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Parent = body
+})
 
-    const speedTrack = setupSlider('speedTrack','speedFill','speedKnob','speedVal',16);
-    const jumpTrack = setupSlider('jumpTrack','jumpFill','jumpKnob','jumpVal',50);
+-- Slider creator (0..1000)
+local function createSlider(parent, yOffset, name, initial)
+	local wrapper = new("Frame", { Size = UDim2.new(1, -24, 0, 34), Position = UDim2.new(0,12,0,yOffset), BackgroundTransparency = 1, Parent = parent })
+	local label = new("TextLabel", { Name = "Label", Size = UDim2.new(0.5,0,1,0), BackgroundTransparency = 1, Text = name, TextColor3 = Color3.new(1,1,1), Font = Enum.Font.Gotham, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left, Parent = wrapper })
+	local valLabel = new("TextLabel", { Name = "Value", Size = UDim2.new(0.4,0,1,0), Position = UDim2.new(0.6,0,0,0), BackgroundTransparency = 1, Text = tostring(initial), TextColor3 = Color3.new(1,1,1), Font = Enum.Font.Gotham, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Right, Parent = wrapper })
 
-    // Actions: sticker opens link
-    sticker.addEventListener('click', ()=> window.open(DISCORD, '_blank'));
+	local track = new("Frame", { Name = "Track", Size = UDim2.new(1,0,0,8), Position = UDim2.new(0,0,1,-10), BackgroundColor3 = Color3.fromRGB(80,80,80), BorderSizePixel = 0, Parent = wrapper })
+	new("UICorner", { CornerRadius = UDim.new(0,8), Parent = track })
 
-    // Close / Minimize
-    closeBtn.addEventListener('click', ()=>{
-      card.style.transition = "opacity .28s ease, transform .28s ease";
-      card.style.opacity = 0;
-      card.style.transform = "scale(.96) translateY(10px)";
-      setTimeout(()=> { card.style.display = 'none'; }, 320);
-    });
+	local fill = new("Frame", { Name = "Fill", Size = UDim2.new(math.clamp(initial/1000,0,1),0,1,0), BackgroundColor3 = Color3.fromRGB(100,200,255), BorderSizePixel = 0, Parent = track })
+	new("UICorner", { CornerRadius = UDim.new(0,8), Parent = fill })
 
-    let minimized = false;
-    minBtn.addEventListener('click', ()=>{
-      minimized = !minimized;
-      if(minimized){
-        card.classList.add('minimized');
-      } else {
-        card.classList.remove('minimized');
-      }
-    });
+	local knob = new("ImageButton", { Name = "Knob", Size = UDim2.new(0,18,0,18), Position = UDim2.new(math.clamp(initial/1000,0,1), -9, 0.5, -9), BackgroundColor3 = Color3.fromRGB(230,230,230), BorderSizePixel = 0, Parent = track })
+	new("UICorner", { CornerRadius = UDim.new(0,9), Parent = knob })
 
-    // Dragging
-    (function enableDrag(){
-      let dragging=false, startX=0, startY=0, startLeft=0, startTop=0;
-      titlebar.addEventListener('mousedown',(e)=>{
-        dragging = true;
-        const rect = card.getBoundingClientRect();
-        startX = e.clientX; startY = e.clientY;
-        startLeft = rect.left; startTop = rect.top;
-        document.body.style.userSelect = 'none';
-      });
-      window.addEventListener('mouseup', ()=>{ dragging = false; document.body.style.userSelect='auto'; });
-      window.addEventListener('mousemove',(e)=>{
-        if(!dragging) return;
-        const dx = e.clientX - startX, dy = e.clientY - startY;
-        card.style.position = 'fixed';
-        card.style.left = (startLeft + dx) + 'px';
-        card.style.top = (startTop + dy) + 'px';
-      });
-      // touch
-      titlebar.addEventListener('touchstart',(e)=>{
-        dragging = true;
-        const rect = card.getBoundingClientRect();
-        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
-        startLeft = rect.left; startTop = rect.top;
-      }, {passive:true});
-      window.addEventListener('touchend', ()=>{ dragging = false; });
-      window.addEventListener('touchmove',(e)=>{
-        if(!dragging) return;
-        const dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY;
-        card.style.position = 'fixed';
-        card.style.left = (startLeft + dx) + 'px';
-        card.style.top = (startTop + dy) + 'px';
-      }, {passive:true});
-    })();
+	local slider = {
+		Wrapper = wrapper,
+		Track = track,
+		Fill = fill,
+		Knob = knob,
+		Label = label,
+		ValueLabel = valLabel,
+		Value = initial,
+		Dragging = false,
+		TrackPixel = 0
+	}
 
-    // fade-in on load (animate into view)
-    setTimeout(()=> card.classList.add('visible'), 80);
+	-- update helper
+	local function updateFromX(x)
+		local rectX = slider.Track.AbsolutePosition.X
+		slider.TrackPixel = slider.Track.AbsoluteSize.X
+		local rel = math.clamp((x - rectX) / math.max(1, slider.TrackPixel), 0, 1)
+		local value = math.floor(rel * 1000 + 0.5)
+		slider.Value = value
+		slider.ValueLabel.Text = tostring(value)
+		slider.Fill.Size = UDim2.new(rel, 0, 1, 0)
+		slider.Knob.Position = UDim2.new(rel, -9, 0.5, -9)
+	end
 
-    // Example: you can read current slider values like this:
-    // parseInt(speedTrack.dataset.value) and parseInt(jumpTrack.dataset.value)
-    // They range 0..1000
-    // For demo, log changes:
-    speedTrack.addEventListener('sliderchanged', e=> console.log("Speed:", e.detail.value));
-    jumpTrack.addEventListener('sliderchanged', e=> console.log("JumpPower:", e.detail.value));
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			slider.Dragging = true
+			updateFromX(input.Position.X)
+		end
+	end)
+	knob.InputChanged:Connect(function(input)
+		if slider.Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			updateFromX(input.Position.X)
+		end
+	end)
+	knob.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			slider.Dragging = false
+		end
+	end)
 
-  })();
-</script>
-</body>
-</html>
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			updateFromX(input.Position.X)
+		end
+	end)
+
+	-- ensure AbsoluteSize exists
+	track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		slider.TrackPixel = track.AbsoluteSize.X
+	end)
+
+	return slider
+end
+
+local speedSlider = createSlider(body, 12, "Speed", 16)
+local jumpSlider = createSlider(body, 56, "JumpPower", 50)
+
+-- Apply values to humanoid safely (clamped 0..1000)
+local function applyToCharacter()
+	local char = player.Character
+	if not char then return end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		local speed = math.clamp(speedSlider.Value or 16, 0, 1000)
+		local jumpP = math.clamp(jumpSlider.Value or 50, 0, 1000)
+		-- Use WalkSpeed and JumpPower
+		humanoid.WalkSpeed = speed
+		-- Some Roblox versions use JumpPower, others use JumpHeight; JumpPower is requested by user
+		pcall(function() humanoid.JumpPower = jumpP end)
+		-- fallback to JumpHeight if JumpPower unavailable (keeps behavior predictable)
+		if humanoid.JumpPower == nil then
+			-- convert approximate JumpPower -> JumpHeight (simple fallback)
+			local height = math.max(0, jumpP / 50) -- heuristic
+			pcall(function() humanoid.JumpHeight = height end)
+		end
+	end
+end
+
+-- keep applying while GUI exists (live update)
+local running = true
+spawn(function()
+	while running do
+		applyToCharacter()
+		task.wait(0.12)
+	end
+end)
+
+player.CharacterAdded:Connect(function()
+	task.wait(0.4)
+	applyToCharacter()
+end)
+
+-- Sticker click opens Discord invite
+sticker.MouseButton1Click:Connect(function()
+	pcall(function()
+		GuiService:OpenBrowserWindow(DISCORD_URL)
+	end)
+end)
+
+-- Dragging implementation for titlebar
+do
+	local dragging, dragStart, startPos, dragInput
+	titleBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+			dragInput = input
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	titleBar.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement then
+			dragInput = input
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input == dragInput then
+			local delta = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+-- Minimize behavior
+local minimized = false
+minBtn.MouseButton1Click:Connect(function()
+	if minimized then
+		minimized = false
+		TweenService:Create(frame, TWEEN_POP, { Size = FRAME_SIZE }):Play()
+		-- show body children
+		for _,v in ipairs(body:GetDescendants()) do
+			if v:IsA("GuiObject") then v.Visible = true end
+		end
+	else
+		minimized = true
+		TweenService:Create(frame, TWEEN_OUT, { Size = MINIMIZED_SIZE }):Play()
+		task.delay(0.18, function()
+			for _,v in ipairs(body:GetDescendants()) do
+				if v:IsA("GuiObject") then v.Visible = false end
+			end
+		end)
+	end
+end)
+
+-- Close behavior: fade out then destroy
+closeBtn.MouseButton1Click:Connect(function()
+	local tweens = {}
+	for _, child in ipairs(frame:GetDescendants()) do
+		if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("ImageLabel") or child:IsA("ImageButton") or child:IsA("Frame") then
+			if child:IsA("TextLabel") or child:IsA("TextButton") then
+				table.insert(tweens, TweenService:Create(child, TWEEN_OUT, { TextTransparency = 1, BackgroundTransparency = 1 }))
+			elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+				table.insert(tweens, TweenService:Create(child, TWEEN_OUT, { ImageTransparency = 1, BackgroundTransparency = 1 }))
+			elseif child:IsA("Frame") then
+				table.insert(tweens, TweenService:Create(child, TWEEN_OUT, { BackgroundTransparency = 1 }))
+			end
+		end
+	end
+	local mainFade = TweenService:Create(frame, TWEEN_OUT, { BackgroundTransparency = 1 })
+	mainFade:Play()
+	for _,t in ipairs(tweens) do t:Play() end
+	task.wait(0.4)
+	running = false
+	screenGui:Destroy()
+end)
+
+-- Fade-in show (pop + fade)
+local function showPopup()
+	-- prepare initial transparencies
+	frame.Visible = true
+	for _, child in ipairs(frame:GetDescendants()) do
+		if child:IsA("TextLabel") or child:IsA("TextButton") then
+			child.TextTransparency = 1
+			if child.BackgroundTransparency ~= nil then child.BackgroundTransparency = 1 end
+		elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+			child.ImageTransparency = 1
+			if child.BackgroundTransparency ~= nil then child.BackgroundTransparency = 1 end
+		elseif child:IsA("Frame") then
+			if child.BackgroundTransparency ~= nil then child.BackgroundTransparency = 1 end
+		end
+	end
+
+	-- pop scale effect (size change) and reveal frame BG
+	frame.Size = UDim2.new(0, 280, 0, 130)
+	local t = TweenService:Create(frame, TWEEN_POP, { Size = FRAME_SIZE, BackgroundTransparency = 0 })
+	t:Play()
+
+	-- stagger reveal of children
+	task.delay(0.08, function()
+		for _, child in ipairs(frame:GetDescendants()) do
+			if child:IsA("TextLabel") or child:IsA("TextButton") then
+				TweenService:Create(child, TWEEN_IN, { TextTransparency = 0, BackgroundTransparency = 0 }):Play()
+			elseif child:IsA("ImageLabel") or child:IsA("ImageButton") then
+				TweenService:Create(child, TWEEN_IN, { ImageTransparency = 0, BackgroundTransparency = 0 }):Play()
+			elseif child:IsA("Frame") then
+				TweenService:Create(child, TWEEN_IN, { BackgroundTransparency = 0 }):Play()
+			end
+		end
+	end)
+end
+
+-- Ensure knob positions after layout, then show
+task.wait(0.05)
+speedSlider.Track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	local rel = math.clamp(speedSlider.Value/1000, 0, 1)
+	speedSlider.Fill.Size = UDim2.new(rel, 0, 1, 0)
+	speedSlider.Knob.Position = UDim2.new(rel, -9, 0.5, -9)
+end)
+jumpSlider.Track:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	local rel = math.clamp(jumpSlider.Value/1000, 0, 1)
+	jumpSlider.Fill.Size = UDim2.new(rel, 0, 1, 0)
+	jumpSlider.Knob.Position = UDim2.new(rel, -9, 0.5, -9)
+end)
+
+task.delay(0.2, showPopup)
