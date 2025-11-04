@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Discord Popup</title>
+<style>
+  :root{
+    --bg:#0f1113;
+    --frame:#37393b;
+    --title:#2d2f32;
+    --accent:#64c8ff;
+    --muted:#bfc3c7;
+    --danger:#aa2828;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b0c0d 0%, #111315 100%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  /* center */
+  .stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  /* squircle container */
+  .card{
+    width:320px;height:150px;border-radius:20px;background:var(--frame);box-shadow:0 8px 30px rgba(0,0,0,.6);position:relative;overflow:hidden;
+    transform-origin:center center;opacity:0;transform:scale(.92) translateY(6px);
+    transition:opacity .45s cubic-bezier(.22,.9,.27,1), transform .35s cubic-bezier(.22,.9,.27,1);
+  }
+  .card.visible{opacity:1;transform:scale(1) translateY(0);}
+  .titlebar{height:36px;background:var(--title);display:flex;align-items:center;padding:0 10px;gap:8px;}
+  .title{flex:1;color:white;font-weight:600;font-size:14px}
+  .btn{width:28px;height:28px;border-radius:6px;border:0;color:white;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+  .close{background:var(--danger)}
+  .min{background:#787878}
+  .body{display:flex;gap:12px;padding:12px;align-items:flex-start}
+  .sticker{width:56px;height:56px;border-radius:12px;background:#0b0c0d;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;flex:0 0 56px}
+  .sticker img{width:100%;height:100%;object-fit:cover;display:block}
+  .content{flex:1;color:var(--muted)}
+  .content h3{margin:0;font-size:16px;color:white;margin-bottom:6px}
+  .row{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .track{height:8px;background:#505050;border-radius:8px;position:relative;flex:1;cursor:pointer}
+  .fill{height:100%;background:var(--accent);width:20%;border-radius:8px}
+  .knob{width:18px;height:18px;border-radius:9px;background:#e9eef2;border:2px solid rgba(0,0,0,.1);position:absolute;top:50%;transform:translateY(-50%);left:0;touch-action:none}
+  .label{font-size:12px;color:#d7d9db;min-width:62px;text-align:left}
+  .value{font-weight:700;color:white;min-width:44px;text-align:right}
+  /* minimized state */
+  .card.minimized{height:36px;width:320px}
+  .card.minimized .body{display:none}
+  /* drag cursor */
+  .titlebar:active{cursor:grabbing}
+  /* small X for closed state */
+  @media (max-width:400px){
+    .card{width:94%}
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div id="card" class="card" role="dialog" aria-label="Discord Popup">
+      <div id="titlebar" class="titlebar">
+        <div class="title">Discord</div>
+        <button id="minBtn" class="btn min" title="Minimize">—</button>
+        <button id="closeBtn" class="btn close" title="Close">✕</button>
+      </div>
+
+      <div class="body">
+        <button id="sticker" class="sticker" title="Open Discord (opens in new tab)">
+          <!-- Replace src with any image url or a GitHub raw link to an image -->
+          <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" alt="Discord">
+        </button>
+
+        <div class="content">
+          <h3>Join our Discord</h3>
+          <div style="color:#bfc3c7;font-size:13px">Click the sticker to open the invite link.</div>
+
+          <div class="row" style="margin-top:12px">
+            <div class="label">Speed</div>
+            <div class="track" id="speedTrack" data-value="16">
+              <div class="fill" id="speedFill" style="width:1.6%"></div>
+              <div class="knob" id="speedKnob" style="left:1.6%"></div>
+            </div>
+            <div class="value" id="speedVal">16</div>
+          </div>
+
+          <div class="row">
+            <div class="label">JumpPower</div>
+            <div class="track" id="jumpTrack" data-value="50">
+              <div class="fill" id="jumpFill" style="width:5%"></div>
+              <div class="knob" id="jumpKnob" style="left:5%"></div>
+            </div>
+            <div class="value" id="jumpVal">50</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  (function(){
+    const DISCORD = "https://discord.gg/aeUzHJJd5";
+    const card = document.getElementById('card');
+    const sticker = document.getElementById('sticker');
+    const closeBtn = document.getElementById('closeBtn');
+    const minBtn = document.getElementById('minBtn');
+    const titlebar = document.getElementById('titlebar');
+
+    // sliders
+    function setupSlider(trackId, fillId, knobId, valueId, initial){
+      const track = document.getElementById(trackId);
+      const fill = document.getElementById(fillId);
+      const knob = document.getElementById(knobId);
+      const val = document.getElementById(valueId);
+      let dragging = false;
+      let width = 0;
+
+      function pctToValue(pct){ return Math.round(pct * 1000); }
+      function valueToPct(v){ return Math.max(0, Math.min(1, v/1000)); }
+
+      function updatePosFromClientX(clientX){
+        const rect = track.getBoundingClientRect();
+        width = rect.width;
+        let rel = (clientX - rect.left)/width;
+        rel = Math.max(0, Math.min(1, rel));
+        fill.style.width = (rel*100) + "%";
+        knob.style.left = (rel*100) + "%";
+        const value = pctToValue(rel);
+        val.textContent = value;
+        track.dataset.value = value;
+        // custom event: sliderchanged
+        track.dispatchEvent(new CustomEvent('sliderchanged',{detail:{value}}));
+      }
+
+      knob.addEventListener('mousedown', (e)=>{ dragging = true; e.preventDefault(); updatePosFromClientX(e.clientX); });
+      window.addEventListener('mouseup', ()=>{ dragging = false; });
+      window.addEventListener('mousemove', (e)=>{ if(dragging) updatePosFromClientX(e.clientX); });
+
+      // touch
+      knob.addEventListener('touchstart',(e)=>{ dragging = true; updatePosFromClientX(e.touches[0].clientX); }, {passive:false});
+      window.addEventListener('touchend', ()=>{ dragging = false; });
+      window.addEventListener('touchmove', (e)=>{ if(dragging) updatePosFromClientX(e.touches[0].clientX); }, {passive:false});
+
+      // clicking track
+      track.addEventListener('click', (e)=> updatePosFromClientX(e.clientX));
+
+      // init
+      const pct = valueToPct(initial);
+      fill.style.width = (pct*100) + "%";
+      knob.style.left = (pct*100) + "%";
+      val.textContent = initial;
+      track.dataset.value = initial;
+
+      return track;
+    }
+
+    const speedTrack = setupSlider('speedTrack','speedFill','speedKnob','speedVal',16);
+    const jumpTrack = setupSlider('jumpTrack','jumpFill','jumpKnob','jumpVal',50);
+
+    // Actions: sticker opens link
+    sticker.addEventListener('click', ()=> window.open(DISCORD, '_blank'));
+
+    // Close / Minimize
+    closeBtn.addEventListener('click', ()=>{
+      card.style.transition = "opacity .28s ease, transform .28s ease";
+      card.style.opacity = 0;
+      card.style.transform = "scale(.96) translateY(10px)";
+      setTimeout(()=> { card.style.display = 'none'; }, 320);
+    });
+
+    let minimized = false;
+    minBtn.addEventListener('click', ()=>{
+      minimized = !minimized;
+      if(minimized){
+        card.classList.add('minimized');
+      } else {
+        card.classList.remove('minimized');
+      }
+    });
+
+    // Dragging
+    (function enableDrag(){
+      let dragging=false, startX=0, startY=0, startLeft=0, startTop=0;
+      titlebar.addEventListener('mousedown',(e)=>{
+        dragging = true;
+        const rect = card.getBoundingClientRect();
+        startX = e.clientX; startY = e.clientY;
+        startLeft = rect.left; startTop = rect.top;
+        document.body.style.userSelect = 'none';
+      });
+      window.addEventListener('mouseup', ()=>{ dragging = false; document.body.style.userSelect='auto'; });
+      window.addEventListener('mousemove',(e)=>{
+        if(!dragging) return;
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        card.style.position = 'fixed';
+        card.style.left = (startLeft + dx) + 'px';
+        card.style.top = (startTop + dy) + 'px';
+      });
+      // touch
+      titlebar.addEventListener('touchstart',(e)=>{
+        dragging = true;
+        const rect = card.getBoundingClientRect();
+        startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+        startLeft = rect.left; startTop = rect.top;
+      }, {passive:true});
+      window.addEventListener('touchend', ()=>{ dragging = false; });
+      window.addEventListener('touchmove',(e)=>{
+        if(!dragging) return;
+        const dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY;
+        card.style.position = 'fixed';
+        card.style.left = (startLeft + dx) + 'px';
+        card.style.top = (startTop + dy) + 'px';
+      }, {passive:true});
+    })();
+
+    // fade-in on load (animate into view)
+    setTimeout(()=> card.classList.add('visible'), 80);
+
+    // Example: you can read current slider values like this:
+    // parseInt(speedTrack.dataset.value) and parseInt(jumpTrack.dataset.value)
+    // They range 0..1000
+    // For demo, log changes:
+    speedTrack.addEventListener('sliderchanged', e=> console.log("Speed:", e.detail.value));
+    jumpTrack.addEventListener('sliderchanged', e=> console.log("JumpPower:", e.detail.value));
+
+  })();
+</script>
+</body>
+</html>
