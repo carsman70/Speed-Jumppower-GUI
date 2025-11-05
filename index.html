@@ -1,4 +1,4 @@
--- ScriptBlock — decimals + auto-fit + small optimizations
+-- ScriptBlock — decimals + auto-fit + update interval 0.04
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
@@ -213,9 +213,7 @@ enableSliderDrag(speedRow); enableSliderDrag(jumpRow)
 
 -- helpers: sanitize and format
 local function sanitizeNumberStringAllowDot(s)
-    -- allow digits and at most one dot
     local cleaned = s:gsub("[^%d%.]", "")
-    -- remove extra dots (keep first)
     local firstDot = cleaned:find("%.")
     if firstDot then
         local before = cleaned:sub(1, firstDot)
@@ -231,7 +229,6 @@ local function formatNumber(n)
     if type(n) ~= "number" then return "0" end
     local s = tostring(n)
     if s:find("%.") then
-        -- trim trailing zeros
         s = s:gsub("(%.%d-)0+$", "%1")
         s = s:gsub("%.$", "")
     end
@@ -246,12 +243,10 @@ local function fitTextToBox(box, text)
     if w <= 0 then return end
     local size = maxSize
     local pad = 6
-    -- try to increase if possible
     while size < maxSize do
         local ts = TextService:GetTextSize(text, size+1, box.Font, Vector2.new(2000,100))
         if ts.X <= w - pad then size = size + 1 else break end
     end
-    -- shrink until fits
     while size > minSize do
         local ts = TextService:GetTextSize(text, size, box.Font, Vector2.new(2000,100))
         if ts.X <= w - pad then break end
@@ -265,7 +260,6 @@ local function liveFilterDigitsAndDot(box)
     box:GetPropertyChangedSignal("Text"):Connect(function()
         local text = box.Text or ""
         local cleaned = text:gsub("[^%d%.]", "")
-        -- remove extra dots
         local firstDot = cleaned:find("%.")
         if firstDot then
             local before = cleaned:sub(1, firstDot)
@@ -282,10 +276,8 @@ local function liveFilterDigitsAndDot(box)
                 box.CursorPosition = newCur
             end)
         end
-        -- adapt size live
         pcall(function() fitTextToBox(box, box.Text) end)
     end)
-    -- also refit on absolute size changes
     box:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() pcall(function() fitTextToBox(box, box.Text) end) end)
 end
 
@@ -304,10 +296,8 @@ local function hookValueBox(slider)
             fitTextToBox(box, box.Text)
             return
         end
-        -- clamp and accept decimal
         local clamped = math.clamp(num, 0, MAX_VALUE)
         if clamped ~= num then
-            -- invalid range -> revert
             box.Text = formatNumber(slider.SavedValue)
             slider.Value = slider.SavedValue
             slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
@@ -359,7 +349,6 @@ minBtn.MouseButton1Click:Connect(function()
     inviteBox.Visible = not minimized
     if minimized then
         mainFrame.Size = UDim2.new(0, FRAME_W, 0, 40)
-        -- move sticker outside mainFrame so it remains usable
         dragSticker.Parent = screenGui
         local absX, absY = mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y
         dragSticker.Position = UDim2.new(0, absX + mainFrame.AbsoluteSize.X - 36, 0, absY + mainFrame.AbsoluteSize.Y + 6)
@@ -385,12 +374,12 @@ speedRow.ValueBox.Text = formatNumber(speedRow.Value)
 jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
 fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
 
--- lightweight loop
+-- lightweight loop (interval updated to 0.04)
 local running = true
 spawn(function()
     while running and screenGui.Parent do
         pcall(applyValues)
-        wait(0.08)
+        wait(0.04)
     end
 end)
 
