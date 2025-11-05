@@ -1,5 +1,5 @@
--- FINAL: Updated GUI with non-deletable invite, typed value validation, snap=5, always-on-top (DisplayOrder lowered, loading bar removed)
--- Paste into StarterPlayerScripts (replace previous LocalScript)
+-- FINAL: Repaired ScriptBlock GUI (LocalScript)
+-- Put this in StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,16 +7,23 @@ local UserInputService = game:GetService("UserInputService")
 local TextService = game:GetService("TextService")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local playerGui = player:WaitForChild("PlayerGui") -- ensure PlayerGui exists
 
 -- CONFIG
 local DEFAULT_SPEED = 16
 local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
-local SNAP = 5                -- snapping every 5 units
+local SNAP = 5
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
--- FRAME
+-- ScreenGui (persistent, topmost)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ScriptBlock_GUI"
+screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 1000 -- restored to be topmost as requested
+screenGui.Parent = playerGui
+
+-- MAIN FRAME
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
@@ -26,7 +33,7 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(12,12,12)
 mainFrame.BackgroundTransparency = 0.18
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.Visible = true -- show immediately (no loading bar)
+mainFrame.Visible = true
 mainFrame.Parent = screenGui
 local corner = Instance.new("UICorner", mainFrame)
 corner.CornerRadius = UDim.new(0, 10)
@@ -62,8 +69,7 @@ minBtn.TextColor3 = Color3.new(1,1,1)
 minBtn.Font = Enum.Font.GothamBold
 minBtn.TextSize = 16
 minBtn.Parent = titleBar
-local minCorner = Instance.new("UICorner", minBtn)
-minCorner.CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0,6)
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "Close"
@@ -75,8 +81,7 @@ closeBtn.TextColor3 = Color3.new(1,1,1)
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 16
 closeBtn.Parent = titleBar
-local closeCorner = Instance.new("UICorner", closeBtn)
-closeCorner.CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,6)
 
 -- BODY
 local body = Instance.new("Frame")
@@ -95,7 +100,7 @@ controlsFrame.BackgroundTransparency = 1
 controlsFrame.Visible = true
 controlsFrame.Parent = body
 
--- Helper: slider row with improved smaller value box
+-- Slider row helper (smaller value box sized to fit "1000")
 local function createSliderRow(parent, y, labelText, default)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 40)
@@ -114,12 +119,12 @@ local function createSliderRow(parent, y, labelText, default)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = row
 
-    -- SMALLER value box sized for "1000"
+    local sampleSize = TextService:GetTextSize("1000", 14, Enum.Font.Gotham, Vector2.new(1000,1000))
+    local boxWidth = math.clamp(math.ceil(sampleSize.X) + 10, 36, 64)
+
     local valueBox = Instance.new("TextBox")
-    local sampleSize = TextService:GetTextSize("1000", 14, Enum.Font.Gotham, Vector2.new(1000, 1000))
-    local boxWidth = math.clamp(math.ceil(sampleSize.X) + 10, 36, 64) -- fit 1000, min 36 max 64
     valueBox.Size = UDim2.new(0, boxWidth, 1, -6)
-    valueBox.Position = UDim2.new(1, - (boxWidth + 16), 0, 3) -- moved slightly left
+    valueBox.Position = UDim2.new(1, - (boxWidth + 16), 0, 3)
     valueBox.BackgroundTransparency = 0.3
     valueBox.Text = tostring(default)
     valueBox.ClearTextOnFocus = false
@@ -128,8 +133,7 @@ local function createSliderRow(parent, y, labelText, default)
     valueBox.TextColor3 = Color3.new(1,1,1)
     valueBox.TextXAlignment = Enum.TextXAlignment.Center
     valueBox.Parent = row
-    local vbCorner = Instance.new("UICorner", valueBox)
-    vbCorner.CornerRadius = UDim.new(0,6)
+    Instance.new("UICorner", valueBox).CornerRadius = UDim.new(0,6)
 
     local track = Instance.new("Frame")
     track.Size = UDim2.new(1, -170, 0, 12)
@@ -137,8 +141,7 @@ local function createSliderRow(parent, y, labelText, default)
     track.BackgroundColor3 = Color3.fromRGB(120,120,120)
     track.BorderSizePixel = 0
     track.Parent = row
-    local trCorner = Instance.new("UICorner", track)
-    trCorner.CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", track).CornerRadius = UDim.new(0,6)
 
     local fill = Instance.new("Frame")
     fill.Size = UDim2.new(default / MAX_VALUE, 0, 1, 0)
@@ -146,8 +149,7 @@ local function createSliderRow(parent, y, labelText, default)
     fill.BackgroundColor3 = Color3.fromRGB(190,190,190)
     fill.BorderSizePixel = 0
     fill.Parent = track
-    local fillCorner2 = Instance.new("UICorner", fill)
-    fillCorner2.CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
 
     local knob = Instance.new("ImageButton")
     knob.Size = UDim2.new(0, 18, 0, 18)
@@ -156,8 +158,7 @@ local function createSliderRow(parent, y, labelText, default)
     knob.BackgroundColor3 = Color3.fromRGB(230,230,230)
     knob.BorderSizePixel = 0
     knob.Parent = track
-    local knobCorner = Instance.new("UICorner", knob)
-    knobCorner.CornerRadius = UDim.new(0, 9)
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(0,9)
     knob.AutoButtonColor = false
 
     return {
@@ -169,7 +170,7 @@ local function createSliderRow(parent, y, labelText, default)
         Knob = knob,
         Value = default,
         Dragging = false,
-        SavedValue = default -- store last valid value
+        SavedValue = default
     }
 end
 
@@ -186,12 +187,11 @@ revertBtn.Font = Enum.Font.GothamBold
 revertBtn.TextSize = 14
 revertBtn.TextColor3 = Color3.new(1,1,1)
 revertBtn.Parent = controlsFrame
-local revertCorner = Instance.new("UICorner", revertBtn)
-revertCorner.CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", revertBtn).CornerRadius = UDim.new(0,6)
 
--- Invite TextBox at bottom-left and NOT deletable
+-- INVITE BOX (non-deletable) bottom-left, auto-resizes with text width
 local inviteBox = Instance.new("TextBox")
-inviteBox.Size = UDim2.new(0.72, 0, 0, 28) -- width will be updated to text size
+inviteBox.Size = UDim2.new(0.72, 0, 0, 28)
 inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
 inviteBox.BackgroundTransparency = 0.3
 inviteBox.Text = DISCORD_INVITE
@@ -201,10 +201,8 @@ inviteBox.TextSize = 14
 inviteBox.TextColor3 = Color3.new(1,1,1)
 inviteBox.TextXAlignment = Enum.TextXAlignment.Left
 inviteBox.Parent = mainFrame
-local inviteCorner = Instance.new("UICorner", inviteBox)
-inviteCorner.CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", inviteBox).CornerRadius = UDim.new(0,6)
 
--- Auto-resize invite box width to text (last letter defines width)
 local function resizeInviteBox()
     local pad = 18
     local size = TextService:GetTextSize(inviteBox.Text, inviteBox.TextSize, inviteBox.Font, Vector2.new(2000, 100))
@@ -214,7 +212,7 @@ local function resizeInviteBox()
 end
 resizeInviteBox()
 
--- prevent user from deleting or changing invite text: if they edit, restore
+-- restore invite if edited and select it
 inviteBox:GetPropertyChangedSignal("Text"):Connect(function()
     if inviteBox.Text ~= DISCORD_INVITE then
         inviteBox.Text = DISCORD_INVITE
@@ -227,13 +225,15 @@ inviteBox:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
--- Clicking invite selects it (user copies manually)
-inviteBox.MouseButton1Click:Connect(function()
-    pcall(function()
-        inviteBox:CaptureFocus()
-        inviteBox.SelectionStart = 1
-        inviteBox.CursorPosition = #inviteBox.Text + 1
-    end)
+-- click/select invite for manual copy (use InputBegan to support TextBox)
+inviteBox.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        pcall(function()
+            inviteBox:CaptureFocus()
+            inviteBox.SelectionStart = 1
+            inviteBox.CursorPosition = #inviteBox.Text + 1
+        end)
+    end
 end)
 
 -- CLAMP helper
@@ -256,8 +256,7 @@ dragSticker.AnchorPoint = Vector2.new(0,0)
 dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
 dragSticker.Image = ""
 dragSticker.Parent = mainFrame
-local dsCorner = Instance.new("UICorner", dragSticker)
-dsCorner.CornerRadius = UDim.new(0,6)
+Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
 
 local isDraggingGUI = false
 local dragStartMouse = Vector2.new()
@@ -287,7 +286,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- SLIDER LOGIC (continuous, snaps to SNAP units)
+-- SLIDER LOGIC (snaps to SNAP)
 local function enableSliderDrag(slider)
     local track = slider.Track
     local knob = slider.Knob
@@ -316,7 +315,7 @@ local function enableSliderDrag(slider)
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
-            slider.SavedValue = value -- update saved valid
+            slider.SavedValue = value
         end
     end)
 
@@ -329,7 +328,7 @@ local function enableSliderDrag(slider)
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
-            slider.SavedValue = value -- update saved valid
+            slider.SavedValue = value
         end
     end)
 end
@@ -337,7 +336,7 @@ end
 enableSliderDrag(speedRow)
 enableSliderDrag(jumpRow)
 
--- TEXTBOX validation behavior: allow typing freely, validate only on FocusLost or Enter
+-- TEXTBOX validation: allow typing freely, validate on FocusLost (revert if outside 0..1000)
 local function sanitizeNumberString(s)
     local cleaned = s:gsub("%D", "")
     if cleaned == "" then return nil end
@@ -346,12 +345,10 @@ end
 
 local function hookValueBox(slider)
     local box = slider.ValueBox
-    -- on focus lost validate and accept/revert
     box.FocusLost:Connect(function(enterPressed)
         local txt = box.Text or ""
         local num = sanitizeNumberString(txt)
         if not num then
-            -- revert to saved valid value
             box.Text = tostring(math.floor(slider.SavedValue + 0.5))
             slider.Value = slider.SavedValue
             slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
@@ -360,14 +357,12 @@ local function hookValueBox(slider)
         end
         num = math.clamp(math.floor(num + 0.5), 0, MAX_VALUE)
         if num < 0 or num > MAX_VALUE then
-            -- invalid -> revert
             box.Text = tostring(math.floor(slider.SavedValue + 0.5))
             slider.Value = slider.SavedValue
             slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 0.5, 0)
             return
         end
-        -- valid: accept exact typed number, update saved
         slider.Value = num
         slider.SavedValue = num
         slider.Fill.Size = UDim2.new(num / MAX_VALUE, 0, 1, 0)
@@ -379,7 +374,7 @@ end
 hookValueBox(speedRow)
 hookValueBox(jumpRow)
 
--- APPLY values to humanoid (safe)
+-- APPLY values to humanoid
 local function applyValues()
     local char = player.Character
     if not char then return end
@@ -389,7 +384,6 @@ local function applyValues()
     if type(jumpRow.Value) ~= "number" then jumpRow.Value = DEFAULT_JUMP end
     hum.WalkSpeed = math.clamp(speedRow.Value, 0, MAX_VALUE)
     hum.JumpPower = math.clamp(jumpRow.Value, 0, MAX_VALUE)
-    -- reflect integer display
     speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
     jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
 end
@@ -417,12 +411,12 @@ minBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- CLOSE
+-- CLOSE (only way to remove)
 closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Initialize visuals to defaults
+-- Initialize visuals
 speedRow.Value = speedRow.Value or DEFAULT_SPEED
 jumpRow.Value = jumpRow.Value or DEFAULT_JUMP
 speedRow.SavedValue = speedRow.SavedValue or speedRow.Value
@@ -434,7 +428,7 @@ jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
 speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
 jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
 
--- Main apply loop (lightweight)
+-- Lightweight apply loop
 local running = true
 spawn(function()
     while running and screenGui.Parent do
@@ -443,12 +437,11 @@ spawn(function()
     end
 end)
 
--- Stop loop when GUI removed
 screenGui.AncestryChanged:Connect(function()
     if not screenGui:IsDescendantOf(game) then running = false end
 end)
 
--- Clamp position on render to keep inside screen
+-- Clamp every frame to keep GUI onscreen
 RunService:BindToRenderStep("ClampGUIPosition", Enum.RenderPriority.Camera.Value + 1, function()
     local pos = mainFrame.AbsolutePosition
     local nx, ny = clampPositionToScreen(pos.X, pos.Y)
