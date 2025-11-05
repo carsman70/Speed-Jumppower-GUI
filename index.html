@@ -1,9 +1,10 @@
--- Final Updated GUI with 5-unit slider snap and improved value boxes
+-- FINAL: Updated GUI with non-deletable invite, typed value validation, snap=5, always-on-top
 -- Paste into StarterPlayerScripts (replace previous LocalScript)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TextService = game:GetService("TextService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -12,13 +13,14 @@ local playerGui = player:WaitForChild("PlayerGui")
 local DEFAULT_SPEED = 16
 local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
-local SNAP = 5                -- <- snapping every 5 units
+local SNAP = 5                -- snapping every 5 units
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
--- Create persistent ScreenGui
+-- Create persistent ScreenGui and make it topmost
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LuxuryPersistentGUI"
 screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 1000  -- keep on top of other ScreenGuis
 screenGui.Parent = playerGui
 
 -- FRAME
@@ -121,7 +123,7 @@ controlsFrame.BackgroundTransparency = 1
 controlsFrame.Visible = false
 controlsFrame.Parent = body
 
--- Helper: create slider row with smaller editable value textbox
+-- Helper: slider row with improved smaller value box
 local function createSliderRow(parent, y, labelText, default)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 40)
@@ -140,10 +142,12 @@ local function createSliderRow(parent, y, labelText, default)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = row
 
-    -- SMALLER value box (improved)
+    -- SMALLER value box sized for "1000"
     local valueBox = Instance.new("TextBox")
-    valueBox.Size = UDim2.new(0, 44, 1, -6) -- smaller, nicer fit
-    valueBox.Position = UDim2.new(1, -60, 0, 3) -- moved slightly left (not too close to edge)
+    local sampleSize = TextService:GetTextSize("1000", 14, Enum.Font.Gotham, Vector2.new(1000, 1000))
+    local boxWidth = math.clamp(math.ceil(sampleSize.X) + 10, 36, 64) -- fit 1000, min 36 max 64
+    valueBox.Size = UDim2.new(0, boxWidth, 1, -6)
+    valueBox.Position = UDim2.new(1, - (boxWidth + 16), 0, 3) -- moved slightly left
     valueBox.BackgroundTransparency = 0.3
     valueBox.Text = tostring(default)
     valueBox.ClearTextOnFocus = false
@@ -156,7 +160,7 @@ local function createSliderRow(parent, y, labelText, default)
     vbCorner.CornerRadius = UDim.new(0,6)
 
     local track = Instance.new("Frame")
-    track.Size = UDim2.new(1, -170, 0, 12) -- slightly wider track to compensate smaller box
+    track.Size = UDim2.new(1, -170, 0, 12)
     track.Position = UDim2.new(0, 110, 0, 14)
     track.BackgroundColor3 = Color3.fromRGB(120,120,120)
     track.BorderSizePixel = 0
@@ -192,7 +196,8 @@ local function createSliderRow(parent, y, labelText, default)
         Fill = fill,
         Knob = knob,
         Value = default,
-        Dragging = false
+        Dragging = false,
+        SavedValue = default -- store last valid value
     }
 end
 
@@ -212,10 +217,10 @@ revertBtn.Parent = controlsFrame
 local revertCorner = Instance.new("UICorner", revertBtn)
 revertCorner.CornerRadius = UDim.new(0,6)
 
--- Invite TextBox & Copy button at bottom (moved left so not near Copy / Drag)
+-- Invite TextBox at bottom-left and NO copy button
 local inviteBox = Instance.new("TextBox")
-inviteBox.Size = UDim2.new(0.72, 0, 0, 28) -- moved left, narrower
-inviteBox.Position = UDim2.new(0.06, 0, 1, -38) -- left offset so it's not near copy/drag
+inviteBox.Size = UDim2.new(0.72, 0, 0, 28) -- width will be updated to text size
+inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
 inviteBox.BackgroundTransparency = 0.3
 inviteBox.Text = DISCORD_INVITE
 inviteBox.ClearTextOnFocus = false
@@ -227,17 +232,40 @@ inviteBox.Parent = mainFrame
 local inviteCorner = Instance.new("UICorner", inviteBox)
 inviteCorner.CornerRadius = UDim.new(0,6)
 
-local copyBtn = Instance.new("TextButton")
-copyBtn.Size = UDim2.new(0, 46, 0, 28)
-copyBtn.Position = UDim2.new(1, -52, 1, -38)
-copyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-copyBtn.Text = "Copy"
-copyBtn.Font = Enum.Font.GothamBold
-copyBtn.TextSize = 14
-copyBtn.TextColor3 = Color3.new(1,1,1)
-copyBtn.Parent = mainFrame
-local copyCorner = Instance.new("UICorner", copyBtn)
-copyCorner.CornerRadius = UDim.new(0,6)
+-- Auto-resize invite box width to text (last letter defines width)
+local function resizeInviteBox()
+    local pad = 18
+    local size = TextService:GetTextSize(inviteBox.Text, inviteBox.TextSize, inviteBox.Font, Vector2.new(2000, 100))
+    local newW = math.clamp(math.ceil(size.X) + pad, 100, FRAME_W - 80)
+    inviteBox.Size = UDim2.new(0, newW, 0, 28)
+    -- reposition to stay left with copy area free
+    inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
+end
+resizeInviteBox()
+
+-- prevent user from deleting or changing invite text: if they edit, restore
+inviteBox:GetPropertyChangedSignal("Text"):Connect(function()
+    if inviteBox.Text ~= DISCORD_INVITE then
+        -- restore immediately and select text for convenience
+        inviteBox.Text = DISCORD_INVITE
+        -- reselect so user can easily copy
+        pcall(function()
+            inviteBox:CaptureFocus()
+            inviteBox.SelectionStart = 1
+            inviteBox.CursorPosition = #inviteBox.Text + 1
+        end)
+        resizeInviteBox()
+    end
+end)
+
+-- Clicking invite selects it (user copies manually)
+inviteBox.MouseButton1Click:Connect(function()
+    pcall(function()
+        inviteBox:CaptureFocus()
+        inviteBox.SelectionStart = 1
+        inviteBox.CursorPosition = #inviteBox.Text + 1
+    end)
+end)
 
 -- CLAMP helper
 local function clampPositionToScreen(px, py)
@@ -290,7 +318,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- SLIDER LOGIC (snap to SNAP units)
+-- SLIDER LOGIC (continuous, snaps to SNAP units)
 local function enableSliderDrag(slider)
     local track = slider.Track
     local knob = slider.Knob
@@ -319,6 +347,7 @@ local function enableSliderDrag(slider)
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
+            slider.SavedValue = value -- update saved valid
         end
     end)
 
@@ -331,6 +360,7 @@ local function enableSliderDrag(slider)
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
+            slider.SavedValue = value -- update saved valid
         end
     end)
 end
@@ -338,49 +368,49 @@ end
 enableSliderDrag(speedRow)
 enableSliderDrag(jumpRow)
 
--- TEXTBOX input validation for typeable values (numbers only, 0..1000), smaller improved box
+-- TEXTBOX validation behavior: allow typing freely, validate only on FocusLost or Enter
 local function sanitizeNumberString(s)
-    -- remove non-digit characters
     local cleaned = s:gsub("%D", "")
-    if cleaned == "" then return "0" end
-    -- strip leading zeros
-    cleaned = cleaned:match("^0*(.*)$") or cleaned
-    if cleaned == "" then cleaned = "0" end
-    return cleaned
+    if cleaned == "" then return nil end
+    return tonumber(cleaned)
 end
 
 local function hookValueBox(slider)
     local box = slider.ValueBox
-    -- select all on focus
-    box.Focused:Connect(function()
-        -- select all by capturing focus then set cursor; keeps UX simple
-        -- Roblox TextBox doesn't have a built-in select-all API; this approximates
-        -- by setting CursorPosition to end and user can overwrite
-        -- (we also listen for text changes to strip non-digits)
-    end)
-
-    -- Strip non-digits live for smooth experience
-    box:GetPropertyChangedSignal("Text"):Connect(function()
-        local t = box.Text or ""
-        local cleaned = t:gsub("[^%d]", "")
-        if cleaned ~= t then
-            local cc = cleaned
-            if cc == "" then cc = "0" end
-            box.Text = cc
-        end
-    end)
-
+    -- on focus lost validate and accept/revert
     box.FocusLost:Connect(function(enterPressed)
         local txt = box.Text or ""
-        local cleaned = sanitizeNumberString(txt)
-        local num = tonumber(cleaned) or 0
-        num = math.clamp(num, 0, MAX_VALUE)
-        -- update slider visuals (apply slider snapping to nearest SNAP only to the slider knob; but keep typed number exact)
-        -- Per request: snapping applies to slider; typed value stays exact (we keep int)
+        local num = sanitizeNumberString(txt)
+        if not num then
+            -- revert to saved valid value
+            box.Text = tostring(math.floor(slider.SavedValue + 0.5))
+            slider.Value = slider.SavedValue
+            slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
+            slider.Knob.Position = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 0.5, 0)
+            return
+        end
+        num = math.clamp(math.floor(num + 0.5), 0, MAX_VALUE)
+        if num < 0 or num > MAX_VALUE then
+            -- invalid -> revert
+            box.Text = tostring(math.floor(slider.SavedValue + 0.5))
+            slider.Value = slider.SavedValue
+            slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
+            slider.Knob.Position = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 0.5, 0)
+            return
+        end
+        -- valid: accept exact typed number, update saved
         slider.Value = num
+        slider.SavedValue = num
         slider.Fill.Size = UDim2.new(num / MAX_VALUE, 0, 1, 0)
         slider.Knob.Position = UDim2.new(num / MAX_VALUE, 0, 0.5, 0)
-        box.Text = tostring(math.floor(num + 0.5))
+        box.Text = tostring(num)
+    end)
+
+    -- also handle Enter pressed while focused (some platforms)
+    box.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            -- FocusLost block above handles it
+        end
     end)
 end
 
@@ -393,12 +423,11 @@ local function applyValues()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-    -- default fallback
     if type(speedRow.Value) ~= "number" then speedRow.Value = DEFAULT_SPEED end
     if type(jumpRow.Value) ~= "number" then jumpRow.Value = DEFAULT_JUMP end
     hum.WalkSpeed = math.clamp(speedRow.Value, 0, MAX_VALUE)
     hum.JumpPower = math.clamp(jumpRow.Value, 0, MAX_VALUE)
-    -- update text boxes display with integer
+    -- reflect integer display
     speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
     jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
 end
@@ -407,6 +436,8 @@ end
 revertBtn.MouseButton1Click:Connect(function()
     speedRow.Value = DEFAULT_SPEED
     jumpRow.Value = DEFAULT_JUMP
+    speedRow.SavedValue = DEFAULT_SPEED
+    jumpRow.SavedValue = DEFAULT_JUMP
     speedRow.Fill.Size = UDim2.new(DEFAULT_SPEED / MAX_VALUE, 0, 1, 0)
     jumpRow.Fill.Size = UDim2.new(DEFAULT_JUMP / MAX_VALUE, 0, 1, 0)
     speedRow.Knob.Position = UDim2.new(DEFAULT_SPEED / MAX_VALUE, 0, 0.5, 0)
@@ -429,22 +460,6 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- COPY invite: select inviteBox text and flash copyBtn green briefly
-copyBtn.MouseButton1Click:Connect(function()
-    -- select the invite text for manual copy
-    inviteBox:CaptureFocus()
-    inviteBox.SelectionStart = 1
-    inviteBox.CursorPosition = #inviteBox.Text + 1
-    -- flash green
-    local old = copyBtn.BackgroundColor3
-    copyBtn.BackgroundColor3 = Color3.fromRGB(40,180,40)
-    delay(0.28, function()
-        if copyBtn and copyBtn.Parent then
-            copyBtn.BackgroundColor3 = old
-        end
-    end)
-end)
-
 -- Finalize loading (step-by-step fill, then show UI)
 local function tweenFillTo(frac)
     loadingFill.Size = UDim2.new(frac, 0, 1, 0)
@@ -461,6 +476,8 @@ mainFrame.Visible = true
 -- Initialize visuals to defaults
 speedRow.Value = speedRow.Value or DEFAULT_SPEED
 jumpRow.Value = jumpRow.Value or DEFAULT_JUMP
+speedRow.SavedValue = speedRow.SavedValue or speedRow.Value
+jumpRow.SavedValue = jumpRow.SavedValue or jumpRow.Value
 speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
 jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
 speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
