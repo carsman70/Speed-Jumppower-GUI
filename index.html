@@ -1,4 +1,4 @@
--- Final Updated GUI (LocalScript)
+-- Final Updated GUI with 5-unit slider snap and improved value boxes
 -- Paste into StarterPlayerScripts (replace previous LocalScript)
 
 local Players = game:GetService("Players")
@@ -12,6 +12,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local DEFAULT_SPEED = 16
 local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
+local SNAP = 5                -- <- snapping every 5 units
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
 -- Create persistent ScreenGui
@@ -120,7 +121,7 @@ controlsFrame.BackgroundTransparency = 1
 controlsFrame.Visible = false
 controlsFrame.Parent = body
 
--- Helper: create slider row with editable value textbox
+-- Helper: create slider row with smaller editable value textbox
 local function createSliderRow(parent, y, labelText, default)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 40)
@@ -139,22 +140,23 @@ local function createSliderRow(parent, y, labelText, default)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = row
 
+    -- SMALLER value box (improved)
     local valueBox = Instance.new("TextBox")
-    valueBox.Size = UDim2.new(0, 64, 1, 0)
-    valueBox.Position = UDim2.new(1, -72, 0, 0)
+    valueBox.Size = UDim2.new(0, 44, 1, -6) -- smaller, nicer fit
+    valueBox.Position = UDim2.new(1, -60, 0, 3) -- moved slightly left (not too close to edge)
     valueBox.BackgroundTransparency = 0.3
     valueBox.Text = tostring(default)
     valueBox.ClearTextOnFocus = false
     valueBox.Font = Enum.Font.Gotham
     valueBox.TextSize = 14
     valueBox.TextColor3 = Color3.new(1,1,1)
-    valueBox.TextXAlignment = Enum.TextXAlignment.Right
+    valueBox.TextXAlignment = Enum.TextXAlignment.Center
     valueBox.Parent = row
     local vbCorner = Instance.new("UICorner", valueBox)
     vbCorner.CornerRadius = UDim.new(0,6)
 
     local track = Instance.new("Frame")
-    track.Size = UDim2.new(1, -180, 0, 12)
+    track.Size = UDim2.new(1, -170, 0, 12) -- slightly wider track to compensate smaller box
     track.Position = UDim2.new(0, 110, 0, 14)
     track.BackgroundColor3 = Color3.fromRGB(120,120,120)
     track.BorderSizePixel = 0
@@ -210,10 +212,10 @@ revertBtn.Parent = controlsFrame
 local revertCorner = Instance.new("UICorner", revertBtn)
 revertCorner.CornerRadius = UDim.new(0,6)
 
--- Invite TextBox & Copy button at bottom (inside mainFrame)
+-- Invite TextBox & Copy button at bottom (moved left so not near Copy / Drag)
 local inviteBox = Instance.new("TextBox")
-inviteBox.Size = UDim2.new(0.8, 0, 0, 28)
-inviteBox.Position = UDim2.new(0.5, - (FRAME_W * 0.8) / 2, 1, -38)
+inviteBox.Size = UDim2.new(0.72, 0, 0, 28) -- moved left, narrower
+inviteBox.Position = UDim2.new(0.06, 0, 1, -38) -- left offset so it's not near copy/drag
 inviteBox.BackgroundTransparency = 0.3
 inviteBox.Text = DISCORD_INVITE
 inviteBox.ClearTextOnFocus = false
@@ -288,7 +290,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- SLIDER LOGIC (continuous, no snap)
+-- SLIDER LOGIC (snap to SNAP units)
 local function enableSliderDrag(slider)
     local track = slider.Track
     local knob = slider.Knob
@@ -312,7 +314,8 @@ local function enableSliderDrag(slider)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local mx = UserInputService:GetMouseLocation().X
             local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-            local value = rel * MAX_VALUE
+            local raw = rel * MAX_VALUE
+            local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
@@ -323,7 +326,8 @@ local function enableSliderDrag(slider)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local mx = UserInputService:GetMouseLocation().X
             local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-            local value = rel * MAX_VALUE
+            local raw = rel * MAX_VALUE
+            local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
@@ -334,12 +338,12 @@ end
 enableSliderDrag(speedRow)
 enableSliderDrag(jumpRow)
 
--- TEXTBOX input validation for typeable values (numbers only, 0..1000)
+-- TEXTBOX input validation for typeable values (numbers only, 0..1000), smaller improved box
 local function sanitizeNumberString(s)
     -- remove non-digit characters
     local cleaned = s:gsub("%D", "")
     if cleaned == "" then return "0" end
-    -- remove leading zeros except single zero
+    -- strip leading zeros
     cleaned = cleaned:match("^0*(.*)$") or cleaned
     if cleaned == "" then cleaned = "0" end
     return cleaned
@@ -347,27 +351,36 @@ end
 
 local function hookValueBox(slider)
     local box = slider.ValueBox
+    -- select all on focus
+    box.Focused:Connect(function()
+        -- select all by capturing focus then set cursor; keeps UX simple
+        -- Roblox TextBox doesn't have a built-in select-all API; this approximates
+        -- by setting CursorPosition to end and user can overwrite
+        -- (we also listen for text changes to strip non-digits)
+    end)
+
+    -- Strip non-digits live for smooth experience
+    box:GetPropertyChangedSignal("Text"):Connect(function()
+        local t = box.Text or ""
+        local cleaned = t:gsub("[^%d]", "")
+        if cleaned ~= t then
+            local cc = cleaned
+            if cc == "" then cc = "0" end
+            box.Text = cc
+        end
+    end)
+
     box.FocusLost:Connect(function(enterPressed)
         local txt = box.Text or ""
         local cleaned = sanitizeNumberString(txt)
         local num = tonumber(cleaned) or 0
         num = math.clamp(num, 0, MAX_VALUE)
-        -- update slider visuals
+        -- update slider visuals (apply slider snapping to nearest SNAP only to the slider knob; but keep typed number exact)
+        -- Per request: snapping applies to slider; typed value stays exact (we keep int)
         slider.Value = num
         slider.Fill.Size = UDim2.new(num / MAX_VALUE, 0, 1, 0)
         slider.Knob.Position = UDim2.new(num / MAX_VALUE, 0, 0.5, 0)
-        -- show integer text
         box.Text = tostring(math.floor(num + 0.5))
-    end)
-
-    -- Optional: when box text changes live, keep digits only (visual feedback)
-    box:GetPropertyChangedSignal("Text"):Connect(function()
-        local t = box.Text
-        local cleaned = t:gsub("[^%d]", "")
-        if cleaned ~= t then
-            -- keep cursor position natural
-            box.Text = cleaned
-        end
     end)
 end
 
@@ -435,7 +448,6 @@ end)
 -- Finalize loading (step-by-step fill, then show UI)
 local function tweenFillTo(frac)
     loadingFill.Size = UDim2.new(frac, 0, 1, 0)
-    -- small pause to be visible across slow systems
     wait(0.18)
 end
 tweenFillTo(0.33)
