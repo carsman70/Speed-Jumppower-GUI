@@ -1,5 +1,5 @@
--- Advanced Final GUI (LocalScript)
--- Paste this into StarterPlayerScripts (replace old script)
+-- Final Updated GUI (LocalScript)
+-- Paste into StarterPlayerScripts (replace previous LocalScript)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,37 +8,34 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Config
+-- CONFIG
 local DEFAULT_SPEED = 16
 local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
-local SNAP = 10
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
--- Create ScreenGui (persist across respawns)
+-- Create persistent ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LuxuryPersistentGUI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- MAIN FRAME (centered)
+-- FRAME
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, FRAME_W, 0, FRAME_H)
 mainFrame.Position = UDim2.new(0.5, -FRAME_W/2, 0.45, -FRAME_H/2)
-mainFrame.AnchorPoint = Vector2.new(0,0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(12,12,12)
 mainFrame.BackgroundTransparency = 0.18
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.Visible = false -- hidden until loading finishes
+mainFrame.Visible = false
 mainFrame.Parent = screenGui
-
 local corner = Instance.new("UICorner", mainFrame)
 corner.CornerRadius = UDim.new(0, 10)
 
--- TOP TITLEBAR
+-- TITLEBAR
 local titleBar = Instance.new("Frame")
 titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 36)
@@ -46,35 +43,19 @@ titleBar.Position = UDim2.new(0, 0, 0, 0)
 titleBar.BackgroundTransparency = 1
 titleBar.Parent = mainFrame
 
--- Title label
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "TitleLabel"
 titleLabel.Size = UDim2.new(0.6, -12, 1, 0)
 titleLabel.Position = UDim2.new(0, 12, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Luxury GUI"
+titleLabel.Text = "ScriptBlock"
 titleLabel.TextColor3 = Color3.new(1,1,1)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
--- Discord small button "D" (left side)
-local discordBtn = Instance.new("TextButton")
-discordBtn.Name = "DiscordBtn"
-discordBtn.Size = UDim2.new(0, 30, 0, 26)
-discordBtn.Position = UDim2.new(0, 6, 0, 5)
-discordBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-discordBtn.Text = "D"
-discordBtn.TextColor3 = Color3.new(1,1,1)
-discordBtn.Font = Enum.Font.GothamBold
-discordBtn.TextSize = 16
-discordBtn.AutoButtonColor = true
-discordBtn.Parent = titleBar
-local dCorner = Instance.new("UICorner", discordBtn)
-dCorner.CornerRadius = UDim.new(0,6)
-
--- Minimize and Close (right side)
+-- Minimize & Close
 local minBtn = Instance.new("TextButton")
 minBtn.Name = "Minimize"
 minBtn.Size = UDim2.new(0, 30, 0, 26)
@@ -101,7 +82,7 @@ closeBtn.Parent = titleBar
 local closeCorner = Instance.new("UICorner", closeBtn)
 closeCorner.CornerRadius = UDim.new(0,6)
 
--- BODY area
+-- BODY
 local body = Instance.new("Frame")
 body.Name = "Body"
 body.Size = UDim2.new(1, 0, 1, -36)
@@ -109,7 +90,7 @@ body.Position = UDim2.new(0, 0, 0, 36)
 body.BackgroundTransparency = 1
 body.Parent = mainFrame
 
--- Loading bar container (centered)
+-- LOADING BAR
 local loadingFrame = Instance.new("Frame")
 loadingFrame.Name = "LoadingFrame"
 loadingFrame.Size = UDim2.new(0, 280, 0, 18)
@@ -130,8 +111,7 @@ loadingFill.Parent = loadingFrame
 local fillCorner = Instance.new("UICorner", loadingFill)
 fillCorner.CornerRadius = UDim.new(0,6)
 
--- UI elements that should appear after load
--- SPEED / JUMP area container
+-- CONTROLS (hidden while loading)
 local controlsFrame = Instance.new("Frame")
 controlsFrame.Name = "Controls"
 controlsFrame.Size = UDim2.new(1, -24, 0, 120)
@@ -140,7 +120,7 @@ controlsFrame.BackgroundTransparency = 1
 controlsFrame.Visible = false
 controlsFrame.Parent = body
 
--- Helper to create a slider row
+-- Helper: create slider row with editable value textbox
 local function createSliderRow(parent, y, labelText, default)
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, 0, 0, 40)
@@ -159,16 +139,19 @@ local function createSliderRow(parent, y, labelText, default)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = row
 
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.Size = UDim2.new(0, 64, 1, 0)
-    valueLabel.Position = UDim2.new(1, -68, 0, 0)
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Text = tostring(default)
-    valueLabel.TextColor3 = Color3.new(1,1,1)
-    valueLabel.Font = Enum.Font.Gotham
-    valueLabel.TextSize = 14
-    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valueLabel.Parent = row
+    local valueBox = Instance.new("TextBox")
+    valueBox.Size = UDim2.new(0, 64, 1, 0)
+    valueBox.Position = UDim2.new(1, -72, 0, 0)
+    valueBox.BackgroundTransparency = 0.3
+    valueBox.Text = tostring(default)
+    valueBox.ClearTextOnFocus = false
+    valueBox.Font = Enum.Font.Gotham
+    valueBox.TextSize = 14
+    valueBox.TextColor3 = Color3.new(1,1,1)
+    valueBox.TextXAlignment = Enum.TextXAlignment.Right
+    valueBox.Parent = row
+    local vbCorner = Instance.new("UICorner", valueBox)
+    vbCorner.CornerRadius = UDim.new(0,6)
 
     local track = Instance.new("Frame")
     track.Size = UDim2.new(1, -180, 0, 12)
@@ -185,8 +168,8 @@ local function createSliderRow(parent, y, labelText, default)
     fill.BackgroundColor3 = Color3.fromRGB(190,190,190)
     fill.BorderSizePixel = 0
     fill.Parent = track
-    local fillCorner = Instance.new("UICorner", fill)
-    fillCorner.CornerRadius = UDim.new(0, 6)
+    local fillCorner2 = Instance.new("UICorner", fill)
+    fillCorner2.CornerRadius = UDim.new(0, 6)
 
     local knob = Instance.new("ImageButton")
     knob.Size = UDim2.new(0, 18, 0, 18)
@@ -200,8 +183,13 @@ local function createSliderRow(parent, y, labelText, default)
     knob.AutoButtonColor = false
 
     return {
-        Row = row, Label = lbl, ValueLabel = valueLabel,
-        Track = track, Fill = fill, Knob = knob, Value = default,
+        Row = row,
+        Label = lbl,
+        ValueBox = valueBox,
+        Track = track,
+        Fill = fill,
+        Knob = knob,
+        Value = default,
         Dragging = false
     }
 end
@@ -209,7 +197,7 @@ end
 local speedRow = createSliderRow(controlsFrame, 0, "Speed", DEFAULT_SPEED)
 local jumpRow = createSliderRow(controlsFrame, 44, "JumpPower", DEFAULT_JUMP)
 
--- Revert button
+-- REVERT button
 local revertBtn = Instance.new("TextButton")
 revertBtn.Size = UDim2.new(0, 86, 0, 30)
 revertBtn.Position = UDim2.new(0, 12, 0, 96)
@@ -222,9 +210,37 @@ revertBtn.Parent = controlsFrame
 local revertCorner = Instance.new("UICorner", revertBtn)
 revertCorner.CornerRadius = UDim.new(0,6)
 
--- Make sure UI doesn't leave screen (clamp helpers)
+-- Invite TextBox & Copy button at bottom (inside mainFrame)
+local inviteBox = Instance.new("TextBox")
+inviteBox.Size = UDim2.new(0.8, 0, 0, 28)
+inviteBox.Position = UDim2.new(0.5, - (FRAME_W * 0.8) / 2, 1, -38)
+inviteBox.BackgroundTransparency = 0.3
+inviteBox.Text = DISCORD_INVITE
+inviteBox.ClearTextOnFocus = false
+inviteBox.Font = Enum.Font.Gotham
+inviteBox.TextSize = 14
+inviteBox.TextColor3 = Color3.new(1,1,1)
+inviteBox.TextXAlignment = Enum.TextXAlignment.Left
+inviteBox.Parent = mainFrame
+local inviteCorner = Instance.new("UICorner", inviteBox)
+inviteCorner.CornerRadius = UDim.new(0,6)
+
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0, 46, 0, 28)
+copyBtn.Position = UDim2.new(1, -52, 1, -38)
+copyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+copyBtn.Text = "Copy"
+copyBtn.Font = Enum.Font.GothamBold
+copyBtn.TextSize = 14
+copyBtn.TextColor3 = Color3.new(1,1,1)
+copyBtn.Parent = mainFrame
+local copyCorner = Instance.new("UICorner", copyBtn)
+copyCorner.CornerRadius = UDim.new(0,6)
+
+-- CLAMP helper
 local function clampPositionToScreen(px, py)
     local camera = workspace.CurrentCamera
+    if not camera then return px, py end
     local view = camera.ViewportSize
     local maxX = math.max(0, view.X - mainFrame.AbsoluteSize.X)
     local maxY = math.max(0, view.Y - mainFrame.AbsoluteSize.Y)
@@ -233,18 +249,17 @@ local function clampPositionToScreen(px, py)
     return nx, ny
 end
 
--- Drag sticker (bottom-right inside the main frame)
+-- DRAG STICKER bottom-right (only thing that moves GUI)
 local dragSticker = Instance.new("ImageButton")
 dragSticker.Size = UDim2.new(0, 30, 0, 30)
 dragSticker.Position = UDim2.new(1, -36, 1, -36)
 dragSticker.AnchorPoint = Vector2.new(0,0)
 dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
-dragSticker.Image = "" -- keep silent; it's a visible square button
+dragSticker.Image = ""
 dragSticker.Parent = mainFrame
 local dsCorner = Instance.new("UICorner", dragSticker)
 dsCorner.CornerRadius = UDim.new(0,6)
 
--- Dragging logic (only sticker moves the whole GUI)
 local isDraggingGUI = false
 local dragStartMouse = Vector2.new()
 local dragStartPos = Vector2.new()
@@ -273,7 +288,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Prevent sliders from triggering GUI drag (they use their own dragging state)
+-- SLIDER LOGIC (continuous, no snap)
 local function enableSliderDrag(slider)
     local track = slider.Track
     local knob = slider.Knob
@@ -293,24 +308,22 @@ local function enableSliderDrag(slider)
         end
     end)
 
-    -- Clicking on track sets value immediately
     track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local mx = UserInputService:GetMouseLocation().X
             local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-            local value = math.floor((rel * MAX_VALUE + SNAP/2) / SNAP) * SNAP
+            local value = rel * MAX_VALUE
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
         end
     end)
 
-    -- Mouse movement updates the slider when dragging
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local mx = UserInputService:GetMouseLocation().X
             local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-            local value = math.floor((rel * MAX_VALUE + SNAP/2) / SNAP) * SNAP
+            local value = rel * MAX_VALUE
             slider.Value = value
             slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
@@ -321,21 +334,63 @@ end
 enableSliderDrag(speedRow)
 enableSliderDrag(jumpRow)
 
--- Apply slider values to humanoid safely and update display
+-- TEXTBOX input validation for typeable values (numbers only, 0..1000)
+local function sanitizeNumberString(s)
+    -- remove non-digit characters
+    local cleaned = s:gsub("%D", "")
+    if cleaned == "" then return "0" end
+    -- remove leading zeros except single zero
+    cleaned = cleaned:match("^0*(.*)$") or cleaned
+    if cleaned == "" then cleaned = "0" end
+    return cleaned
+end
+
+local function hookValueBox(slider)
+    local box = slider.ValueBox
+    box.FocusLost:Connect(function(enterPressed)
+        local txt = box.Text or ""
+        local cleaned = sanitizeNumberString(txt)
+        local num = tonumber(cleaned) or 0
+        num = math.clamp(num, 0, MAX_VALUE)
+        -- update slider visuals
+        slider.Value = num
+        slider.Fill.Size = UDim2.new(num / MAX_VALUE, 0, 1, 0)
+        slider.Knob.Position = UDim2.new(num / MAX_VALUE, 0, 0.5, 0)
+        -- show integer text
+        box.Text = tostring(math.floor(num + 0.5))
+    end)
+
+    -- Optional: when box text changes live, keep digits only (visual feedback)
+    box:GetPropertyChangedSignal("Text"):Connect(function()
+        local t = box.Text
+        local cleaned = t:gsub("[^%d]", "")
+        if cleaned ~= t then
+            -- keep cursor position natural
+            box.Text = cleaned
+        end
+    end)
+end
+
+hookValueBox(speedRow)
+hookValueBox(jumpRow)
+
+-- APPLY values to humanoid (safe)
 local function applyValues()
     local char = player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
+    -- default fallback
     if type(speedRow.Value) ~= "number" then speedRow.Value = DEFAULT_SPEED end
     if type(jumpRow.Value) ~= "number" then jumpRow.Value = DEFAULT_JUMP end
     hum.WalkSpeed = math.clamp(speedRow.Value, 0, MAX_VALUE)
     hum.JumpPower = math.clamp(jumpRow.Value, 0, MAX_VALUE)
-    speedRow.ValueLabel.Text = tostring(math.floor(speedRow.Value))
-    jumpRow.ValueLabel.Text = tostring(math.floor(jumpRow.Value))
+    -- update text boxes display with integer
+    speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
+    jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
 end
 
--- Revert button functionality
+-- REVERT
 revertBtn.MouseButton1Click:Connect(function()
     speedRow.Value = DEFAULT_SPEED
     jumpRow.Value = DEFAULT_JUMP
@@ -346,11 +401,9 @@ revertBtn.MouseButton1Click:Connect(function()
     applyValues()
 end)
 
--- Minimize button toggles content visibility
+-- MINIMIZE
 minBtn.MouseButton1Click:Connect(function()
-    local visible = controlsFrame.Visible
-    controlsFrame.Visible = not visible
-    -- adjust frame height when minimized
+    controlsFrame.Visible = not controlsFrame.Visible
     if controlsFrame.Visible then
         mainFrame.Size = UDim2.new(0, FRAME_W, 0, FRAME_H)
     else
@@ -358,49 +411,52 @@ minBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Close unloads GUI (only way to remove)
+-- CLOSE
 closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Discord button behavior: selects hidden TextBox for manual copy and flashes green
-discordBtn.MouseButton1Click:Connect(function()
-    local oldColor = discordBtn.BackgroundColor3
-    discordBtn.BackgroundColor3 = Color3.fromRGB(40,180,40) -- green indicator
-    -- create a hidden TextBox to allow manual copying
-    local tb = Instance.new("TextBox")
-    tb.Parent = screenGui
-    tb.Text = DISCORD_INVITE
-    tb.ClearTextOnFocus = false
-    tb.TextEditable = false
-    tb.Visible = false
-    tb:CaptureFocus()
-    tb.SelectionStart = 1
-    tb.CursorPosition = #tb.Text + 1
-    -- brief delay then revert color and remove textbox
-    delay(0.25, function()
-        pcall(function() discordBtn.BackgroundColor3 = oldColor end)
-        pcall(function() tb:Destroy() end)
+-- COPY invite: select inviteBox text and flash copyBtn green briefly
+copyBtn.MouseButton1Click:Connect(function()
+    -- select the invite text for manual copy
+    inviteBox:CaptureFocus()
+    inviteBox.SelectionStart = 1
+    inviteBox.CursorPosition = #inviteBox.Text + 1
+    -- flash green
+    local old = copyBtn.BackgroundColor3
+    copyBtn.BackgroundColor3 = Color3.fromRGB(40,180,40)
+    delay(0.28, function()
+        if copyBtn and copyBtn.Parent then
+            copyBtn.BackgroundColor3 = old
+        end
     end)
 end)
 
--- Finalize loading: show UI and controls
-loadingFill.Size = UDim2.new(1, 0, 1, 0) -- ensure full
-wait(0.12) -- tiny pause so player sees progress completed
+-- Finalize loading (step-by-step fill, then show UI)
+local function tweenFillTo(frac)
+    loadingFill.Size = UDim2.new(frac, 0, 1, 0)
+    -- small pause to be visible across slow systems
+    wait(0.18)
+end
+tweenFillTo(0.33)
+tweenFillTo(0.66)
+tweenFillTo(1)
+wait(0.08)
 loadingFrame:Destroy()
 controlsFrame.Visible = true
 mainFrame.Visible = true
 
--- Initialize slider visuals if defaults
-speedRow.Fill.Size = UDim2.new((speedRow.Value or DEFAULT_SPEED) / MAX_VALUE, 0, 1, 0)
-speedRow.Knob.Position = UDim2.new((speedRow.Value or DEFAULT_SPEED) / MAX_VALUE, 0, 0.5, 0)
-speedRow.ValueLabel.Text = tostring(math.floor(speedRow.Value or DEFAULT_SPEED))
+-- Initialize visuals to defaults
+speedRow.Value = speedRow.Value or DEFAULT_SPEED
+jumpRow.Value = jumpRow.Value or DEFAULT_JUMP
+speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
+jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
+speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
+jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
+speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
+jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
 
-jumpRow.Fill.Size = UDim2.new((jumpRow.Value or DEFAULT_JUMP) / MAX_VALUE, 0, 1, 0)
-jumpRow.Knob.Position = UDim2.new((jumpRow.Value or DEFAULT_JUMP) / MAX_VALUE, 0, 0.5, 0)
-jumpRow.ValueLabel.Text = tostring(math.floor(jumpRow.Value or DEFAULT_JUMP))
-
--- Keep applying values while GUI exists; survive death/respawn
+-- Main apply loop (lightweight)
 local running = true
 spawn(function()
     while running and screenGui.Parent do
@@ -409,13 +465,12 @@ spawn(function()
     end
 end)
 
--- If GUI destroyed, stop loop
+-- Stop loop when GUI removed
 screenGui.AncestryChanged:Connect(function()
     if not screenGui:IsDescendantOf(game) then running = false end
 end)
 
--- Ensure GUI remains visible after respawn (ResetOnSpawn=false already set)
--- Also clamp when camera resizes to keep GUI on screen
+-- Clamp position on render to keep inside screen
 RunService:BindToRenderStep("ClampGUIPosition", Enum.RenderPriority.Camera.Value + 1, function()
     local pos = mainFrame.AbsolutePosition
     local nx, ny = clampPositionToScreen(pos.X, pos.Y)
