@@ -1,4 +1,4 @@
--- FINAL: Updated GUI with non-deletable invite, typed value validation, snap=5, always-on-top
+-- FINAL: Updated GUI with non-deletable invite, typed value validation, snap=5, always-on-top (DisplayOrder lowered, loading bar removed)
 -- Paste into StarterPlayerScripts (replace previous LocalScript)
 
 local Players = game:GetService("Players")
@@ -16,11 +16,11 @@ local MAX_VALUE = 1000
 local SNAP = 5                -- snapping every 5 units
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
--- Create persistent ScreenGui and make it topmost
+-- Create persistent ScreenGui and make it less intrusive (lowered DisplayOrder)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "LuxuryPersistentGUI"
 screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 1000  -- keep on top of other ScreenGuis
+screenGui.DisplayOrder = 10  -- lowered so it's not always the absolute topmost
 screenGui.Parent = playerGui
 
 -- FRAME
@@ -33,7 +33,7 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(12,12,12)
 mainFrame.BackgroundTransparency = 0.18
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.Visible = false
+mainFrame.Visible = true -- show immediately (no loading bar)
 mainFrame.Parent = screenGui
 local corner = Instance.new("UICorner", mainFrame)
 corner.CornerRadius = UDim.new(0, 10)
@@ -93,34 +93,13 @@ body.Position = UDim2.new(0, 0, 0, 36)
 body.BackgroundTransparency = 1
 body.Parent = mainFrame
 
--- LOADING BAR
-local loadingFrame = Instance.new("Frame")
-loadingFrame.Name = "LoadingFrame"
-loadingFrame.Size = UDim2.new(0, 280, 0, 18)
-loadingFrame.Position = UDim2.new(0.5, -140, 0.5, -9)
-loadingFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-loadingFrame.BorderSizePixel = 0
-loadingFrame.Parent = body
-local loadCorner = Instance.new("UICorner", loadingFrame)
-loadCorner.CornerRadius = UDim.new(0,6)
-
-local loadingFill = Instance.new("Frame")
-loadingFill.Name = "LoadingFill"
-loadingFill.Size = UDim2.new(0, 0, 1, 0)
-loadingFill.Position = UDim2.new(0, 0, 0, 0)
-loadingFill.BackgroundColor3 = Color3.fromRGB(120,120,120)
-loadingFill.BorderSizePixel = 0
-loadingFill.Parent = loadingFrame
-local fillCorner = Instance.new("UICorner", loadingFill)
-fillCorner.CornerRadius = UDim.new(0,6)
-
--- CONTROLS (hidden while loading)
+-- CONTROLS (visible immediately)
 local controlsFrame = Instance.new("Frame")
 controlsFrame.Name = "Controls"
 controlsFrame.Size = UDim2.new(1, -24, 0, 120)
 controlsFrame.Position = UDim2.new(0, 12, 0, 12)
 controlsFrame.BackgroundTransparency = 1
-controlsFrame.Visible = false
+controlsFrame.Visible = true
 controlsFrame.Parent = body
 
 -- Helper: slider row with improved smaller value box
@@ -217,7 +196,7 @@ revertBtn.Parent = controlsFrame
 local revertCorner = Instance.new("UICorner", revertBtn)
 revertCorner.CornerRadius = UDim.new(0,6)
 
--- Invite TextBox at bottom-left and NO copy button
+-- Invite TextBox at bottom-left and NOT deletable
 local inviteBox = Instance.new("TextBox")
 inviteBox.Size = UDim2.new(0.72, 0, 0, 28) -- width will be updated to text size
 inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
@@ -238,7 +217,6 @@ local function resizeInviteBox()
     local size = TextService:GetTextSize(inviteBox.Text, inviteBox.TextSize, inviteBox.Font, Vector2.new(2000, 100))
     local newW = math.clamp(math.ceil(size.X) + pad, 100, FRAME_W - 80)
     inviteBox.Size = UDim2.new(0, newW, 0, 28)
-    -- reposition to stay left with copy area free
     inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
 end
 resizeInviteBox()
@@ -246,9 +224,7 @@ resizeInviteBox()
 -- prevent user from deleting or changing invite text: if they edit, restore
 inviteBox:GetPropertyChangedSignal("Text"):Connect(function()
     if inviteBox.Text ~= DISCORD_INVITE then
-        -- restore immediately and select text for convenience
         inviteBox.Text = DISCORD_INVITE
-        -- reselect so user can easily copy
         pcall(function()
             inviteBox:CaptureFocus()
             inviteBox.SelectionStart = 1
@@ -405,13 +381,6 @@ local function hookValueBox(slider)
         slider.Knob.Position = UDim2.new(num / MAX_VALUE, 0, 0.5, 0)
         box.Text = tostring(num)
     end)
-
-    -- also handle Enter pressed while focused (some platforms)
-    box.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            -- FocusLost block above handles it
-        end
-    end)
 end
 
 hookValueBox(speedRow)
@@ -459,19 +428,6 @@ end)
 closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
-
--- Finalize loading (step-by-step fill, then show UI)
-local function tweenFillTo(frac)
-    loadingFill.Size = UDim2.new(frac, 0, 1, 0)
-    wait(0.18)
-end
-tweenFillTo(0.33)
-tweenFillTo(0.66)
-tweenFillTo(1)
-wait(0.08)
-loadingFrame:Destroy()
-controlsFrame.Visible = true
-mainFrame.Visible = true
 
 -- Initialize visuals to defaults
 speedRow.Value = speedRow.Value or DEFAULT_SPEED
