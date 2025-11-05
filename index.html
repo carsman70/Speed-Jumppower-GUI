@@ -1,5 +1,5 @@
--- ScriptBlock — decal applied to drag sticker (uses decal id 5172066983)
--- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
+-- ScriptBlock — final fix: decal applied directly to dragSticker.Image (id 5172066983)
+-- Paste this LocalScript into StarterPlayer > StarterPlayerScripts (replace old)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -156,36 +156,34 @@ local function clampPositionToScreen(px, py)
     return math.clamp(px, 0, maxX), math.clamp(py, 0, maxY)
 end
 
--- Drag sticker
+-- Drag sticker (ImageButton uses the decal directly)
 local dragSticker = Instance.new("ImageButton")
 dragSticker.Size = UDim2.new(0,30,0,30); dragSticker.Position = UDim2.new(1,-36,1,-36)
-dragSticker.AnchorPoint = Vector2.new(0,0); dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
-dragSticker.Image = ""; dragSticker.Parent = mainFrame
+dragSticker.AnchorPoint = Vector2.new(0,0)
+dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
+dragSticker.Image = DRAG_ICON_IMAGE -- set image directly on the ImageButton
+dragSticker.ScaleType = Enum.ScaleType.Fit
+dragSticker.Parent = mainFrame
 Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
 local originalStickerPos = dragSticker.Position
 
--- ImageLabel on top of the sticker
-local dragIcon = Instance.new("ImageLabel")
-dragIcon.Name = "DragIcon"
-dragIcon.Size = UDim2.new(1, 0, 1, 0)
-dragIcon.Position = UDim2.new(0, 0, 0, 0)
-dragIcon.BackgroundTransparency = 1
-dragIcon.ScaleType = Enum.ScaleType.Fit
-dragIcon.Parent = dragSticker
-dragIcon.Image = DRAG_ICON_IMAGE
-dragIcon.ImageTransparency = 0
-dragIcon.Visible = true
-dragIcon.ZIndex = dragSticker.ZIndex + 2
--- do not block input
-dragIcon.Active = false
-dragIcon.Selectable = false
-
--- preload image to make it appear reliably
+-- Preload the decal and print status for debugging
 if DRAG_ICON_IMAGE ~= "" then
-    pcall(function()
-        ContentProvider:PreloadAsync({dragIcon})
+    spawn(function()
+        local ok, err = pcall(function()
+            ContentProvider:PreloadAsync({DRAG_ICON_IMAGE})
+        end)
+        if ok then
+            print("[ScriptBlock] Drag icon preload succeeded:", DRAG_ICON_IMAGE)
+        else
+            warn("[ScriptBlock] Drag icon preload failed:", tostring(err))
+        end
     end)
 end
+
+-- Ensure image is visible and high ZIndex
+dragSticker.ImageTransparency = 0
+dragSticker.ZIndex = dragSticker.ZIndex + 2
 
 local isDraggingGUI = false
 local dragStartMouse = Vector2.new()
@@ -215,6 +213,7 @@ UserInputService.InputChanged:Connect(function(input)
         local nx, ny = clampPositionToScreen(newPos.X, newPos.Y)
         mainFrame.Position = UDim2.new(0, nx, 0, ny)
         if dragSticker.Parent == screenGui then
+            -- keep sticker positioned near mainFrame when detached
             dragSticker.Position = UDim2.new(0, nx + mainFrame.AbsoluteSize.X - 36, 0, ny + mainFrame.AbsoluteSize.Y + 6)
         end
     end
@@ -256,8 +255,7 @@ end
 
 enableSliderDrag(speedRow); enableSliderDrag(jumpRow)
 
--- helpers and textbox handling left unchanged (decimals allowed, auto-fit, 0..1000 validation)
-
+-- helpers and textbox handling (decimals allowed, auto-fit, 0..1000 validation)
 local function sanitizeNumberStringAllowDot(s)
     local cleaned = s:gsub("[^%d%.]", "")
     local firstDot = cleaned:find("%.")
@@ -382,7 +380,7 @@ revertBtn.MouseButton1Click:Connect(function()
     applyValues()
 end)
 
--- minimize behavior
+-- minimize behavior (invite hide + sticker move)
 local minimized = false
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
