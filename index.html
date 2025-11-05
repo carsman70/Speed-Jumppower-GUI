@@ -1,4 +1,4 @@
--- ScriptBlock — decimals + auto-fit + update interval 0.04
+-- ScriptBlock — updated: new discord invite + drag-icon on drag sticker
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
@@ -13,7 +13,12 @@ local DEFAULT_SPEED = 16
 local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
 local SNAP = 5
-local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
+
+-- <<< UPDATE: new invite link requested >>> 
+local DISCORD_INVITE = "https://discord.gg/HbW9mRJBC"
+
+
+local DRAG_ICON_IMAGE = "5172066983"  
 
 -- create ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -158,29 +163,63 @@ dragSticker.Image = ""; dragSticker.Parent = mainFrame
 Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
 local originalStickerPos = dragSticker.Position
 
-local isDraggingGUI, dragStartMouse, dragStartPos = false, Vector2.new(), Vector2.new()
-dragSticker.InputBegan:Connect(function(input)
+-- <<< NEW: Image placed on top of dragSticker, auto-fit to sticker size >>>
+local dragIcon = Instance.new("ImageLabel")
+dragIcon.Name = "DragIcon"
+dragIcon.Size = UDim2.new(1, 0, 1, 0)
+dragIcon.Position = UDim2.new(0, 0, 0, 0)
+dragIcon.BackgroundTransparency = 1
+dragIcon.ScaleType = Enum.ScaleType.Fit
+dragIcon.Parent = dragSticker
+if DRAG_ICON_IMAGE ~= "" then
+    dragIcon.Image = DRAG_ICON_IMAGE
+else
+    dragIcon.Image = "" -- no image until you set DRAG_ICON_IMAGE above
+end
+-- ensure the icon doesn't block input to the sticker (so dragging still works)
+dragIcon.Active = false
+dragIcon.Selectable = false
+dragIcon.ZIndex = dragSticker.ZIndex + 1
+
+local isDraggingGUI = false
+local dragStartMouse = Vector2.new()
+local dragStartPos = Vector2.new()
+
+local function beginDrag(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         isDraggingGUI = true
-        local m = UserInputService:GetMouseLocation()
-        dragStartMouse = Vector2.new(m.X,m.Y)
+        local mpos = UserInputService:GetMouseLocation()
+        dragStartMouse = Vector2.new(mpos.X, mpos.Y)
         dragStartPos = Vector2.new(mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y)
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then isDraggingGUI = false end end)
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDraggingGUI = false
+            end
+        end)
     end
-end)
+end
+
+dragSticker.InputBegan:Connect(beginDrag)
+
 UserInputService.InputChanged:Connect(function(input)
     if isDraggingGUI and input.UserInputType == Enum.UserInputType.MouseMovement then
         local m = UserInputService:GetMouseLocation()
-        local delta = Vector2.new(m.X,m.Y) - dragStartMouse
+        local delta = Vector2.new(m.X, m.Y) - dragStartMouse
         local newPos = dragStartPos + delta
         local nx, ny = clampPositionToScreen(newPos.X, newPos.Y)
         mainFrame.Position = UDim2.new(0, nx, 0, ny)
         if dragSticker.Parent == screenGui then
+            -- reposition sticker (and its child dragIcon) to stay just below/near mainFrame
             dragSticker.Position = UDim2.new(0, nx + mainFrame.AbsoluteSize.X - 36, 0, ny + mainFrame.AbsoluteSize.Y + 6)
         end
     end
 end)
-UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then isDraggingGUI = false end end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDraggingGUI = false
+    end
+end)
 
 -- Slider logic (snap to SNAP)
 local function enableSliderDrag(slider)
@@ -209,9 +248,10 @@ local function enableSliderDrag(slider)
         end
     end)
 end
+
 enableSliderDrag(speedRow); enableSliderDrag(jumpRow)
 
--- helpers: sanitize and format
+-- helpers: sanitize and format (allow decimal)
 local function sanitizeNumberStringAllowDot(s)
     local cleaned = s:gsub("[^%d%.]", "")
     local firstDot = cleaned:find("%.")
@@ -374,7 +414,7 @@ speedRow.ValueBox.Text = formatNumber(speedRow.Value)
 jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
 fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
 
--- lightweight loop (interval updated to 0.04)
+-- lightweight loop (interval 0.04)
 local running = true
 spawn(function()
     while running and screenGui.Parent do
