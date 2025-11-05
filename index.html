@@ -1,5 +1,5 @@
--- ScriptBlock — final adjustments
--- Put this LocalScript into StarterPlayer > StarterPlayerScripts (replace old)
+-- ScriptBlock — decimals + auto-fit + small optimizations
+-- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,23 +9,22 @@ local TextService = game:GetService("TextService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- CONFIG
 local DEFAULT_SPEED = 16
 local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
 local SNAP = 5
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
--- ScreenGui (persistent & on-top)
+-- create ScreenGui
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ScriptBlock_GUI"
 screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1000
 screenGui.Parent = playerGui
 
--- MAIN FRAME
+-- main UI (kept identical visually)
 local FRAME_W, FRAME_H = 360, 240
-local mainFrame = Instance.new("Frame")
+local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, FRAME_W, 0, FRAME_H)
 mainFrame.Position = UDim2.new(0.5, -FRAME_W/2, 0.45, -FRAME_H/2)
@@ -34,97 +33,55 @@ mainFrame.BackgroundTransparency = 0.18
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.Visible = true
-mainFrame.Parent = screenGui
-local corner = Instance.new("UICorner", mainFrame)
-corner.CornerRadius = UDim.new(0, 10)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,10)
 
--- TITLEBAR
-local titleBar = Instance.new("Frame")
+local titleBar = Instance.new("Frame", mainFrame)
 titleBar.Name = "TitleBar"
-titleBar.Size = UDim2.new(1, 0, 0, 36)
-titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.Size = UDim2.new(1,0,0,36)
 titleBar.BackgroundTransparency = 1
-titleBar.Parent = mainFrame
-
-local titleLabel = Instance.new("TextLabel")
+local titleLabel = Instance.new("TextLabel", titleBar)
 titleLabel.Name = "TitleLabel"
 titleLabel.Size = UDim2.new(0.6, -12, 1, 0)
-titleLabel.Position = UDim2.new(0, 12, 0, 0)
+titleLabel.Position = UDim2.new(0,12,0,0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "ScriptBlock"
 titleLabel.TextColor3 = Color3.new(1,1,1)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = titleBar
 
--- Minimize & Close
-local minBtn = Instance.new("TextButton")
-minBtn.Name = "Minimize"
-minBtn.Size = UDim2.new(0, 30, 0, 26)
-minBtn.Position = UDim2.new(1, -76, 0, 5)
-minBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-minBtn.Text = "—"
-minBtn.TextColor3 = Color3.new(1,1,1)
-minBtn.Font = Enum.Font.GothamBold
-minBtn.TextSize = 16
-minBtn.Parent = titleBar
+local minBtn = Instance.new("TextButton", titleBar)
+minBtn.Name = "Minimize"; minBtn.Size = UDim2.new(0,30,0,26); minBtn.Position = UDim2.new(1,-76,0,5)
+minBtn.BackgroundColor3 = Color3.fromRGB(70,70,70); minBtn.Text = "—"; minBtn.Font = Enum.Font.GothamBold; minBtn.TextSize = 16
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0,6)
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Name = "Close"
-closeBtn.Size = UDim2.new(0, 30, 0, 26)
-closeBtn.Position = UDim2.new(1, -40, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(140,20,20)
-closeBtn.Text = "X"
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 16
-closeBtn.Parent = titleBar
+local closeBtn = Instance.new("TextButton", titleBar)
+closeBtn.Name = "Close"; closeBtn.Size = UDim2.new(0,30,0,26); closeBtn.Position = UDim2.new(1,-40,0,5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(140,20,20); closeBtn.Text = "X"; closeBtn.Font = Enum.Font.GothamBold; closeBtn.TextSize = 16
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,6)
 
--- BODY
-local body = Instance.new("Frame")
-body.Name = "Body"
-body.Size = UDim2.new(1, 0, 1, -36)
-body.Position = UDim2.new(0, 0, 0, 36)
-body.BackgroundTransparency = 1
-body.Parent = mainFrame
+local body = Instance.new("Frame", mainFrame)
+body.Name = "Body"; body.Size = UDim2.new(1,0,1,-36); body.Position = UDim2.new(0,0,0,36); body.BackgroundTransparency = 1
 
--- CONTROLS
-local controlsFrame = Instance.new("Frame")
-controlsFrame.Name = "Controls"
-controlsFrame.Size = UDim2.new(1, -24, 0, 120)
-controlsFrame.Position = UDim2.new(0, 12, 0, 12)
-controlsFrame.BackgroundTransparency = 1
-controlsFrame.Visible = true
-controlsFrame.Parent = body
+local controlsFrame = Instance.new("Frame", body)
+controlsFrame.Name = "Controls"; controlsFrame.Size = UDim2.new(1,-24,0,120); controlsFrame.Position = UDim2.new(0,12,0,12)
+controlsFrame.BackgroundTransparency = 1; controlsFrame.Visible = true
 
--- Slider helper (smaller value box sized to "1000")
+-- Row creation helper
 local function createSliderRow(parent, y, labelText, default)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 40)
-    row.Position = UDim2.new(0, 0, 0, y)
-    row.BackgroundTransparency = 1
-    row.Parent = parent
+    local row = Instance.new("Frame", parent)
+    row.Size = UDim2.new(1,0,0,40); row.Position = UDim2.new(0,0,0,y); row.BackgroundTransparency = 1
 
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0, 100, 1, 0)
-    lbl.Position = UDim2.new(0, 0, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = labelText
-    lbl.TextColor3 = Color3.new(1,1,1)
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 14
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = row
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size = UDim2.new(0,100,1,0); lbl.Position = UDim2.new(0,0,0,0)
+    lbl.BackgroundTransparency = 1; lbl.Text = labelText; lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = Enum.Font.Gotham; lbl.TextSize = 14; lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local sampleSize = TextService:GetTextSize("1000", 14, Enum.Font.Gotham, Vector2.new(1000,1000))
     local boxWidth = math.clamp(math.ceil(sampleSize.X) + 10, 36, 64)
 
-    local valueBox = Instance.new("TextBox")
+    local valueBox = Instance.new("TextBox", row)
     valueBox.Size = UDim2.new(0, boxWidth, 1, -6)
-    valueBox.Position = UDim2.new(1, - (boxWidth + 16), 0, 3)
+    valueBox.Position = UDim2.new(1, -(boxWidth + 16), 0, 3)
     valueBox.BackgroundTransparency = 0.3
     valueBox.Text = tostring(default)
     valueBox.ClearTextOnFocus = false
@@ -132,242 +89,192 @@ local function createSliderRow(parent, y, labelText, default)
     valueBox.TextSize = 14
     valueBox.TextColor3 = Color3.new(1,1,1)
     valueBox.TextXAlignment = Enum.TextXAlignment.Center
-    valueBox.Parent = row
     Instance.new("UICorner", valueBox).CornerRadius = UDim.new(0,6)
 
-    local track = Instance.new("Frame")
-    track.Size = UDim2.new(1, -170, 0, 12)
-    track.Position = UDim2.new(0, 110, 0, 14)
-    track.BackgroundColor3 = Color3.fromRGB(120,120,120)
-    track.BorderSizePixel = 0
-    track.Parent = row
+    local track = Instance.new("Frame", row)
+    track.Size = UDim2.new(1, -170, 0, 12); track.Position = UDim2.new(0,110,0,14)
+    track.BackgroundColor3 = Color3.fromRGB(120,120,120); track.BorderSizePixel = 0
     Instance.new("UICorner", track).CornerRadius = UDim.new(0,6)
 
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(default / MAX_VALUE, 0, 1, 0)
-    fill.Position = UDim2.new(0, 0, 0, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(190,190,190)
-    fill.BorderSizePixel = 0
-    fill.Parent = track
+    local fill = Instance.new("Frame", track)
+    fill.Size = UDim2.new(default / MAX_VALUE, 0, 1, 0); fill.BackgroundColor3 = Color3.fromRGB(190,190,190)
     Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
 
-    local knob = Instance.new("ImageButton")
-    knob.Size = UDim2.new(0, 18, 0, 18)
-    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    local knob = Instance.new("ImageButton", track)
+    knob.Size = UDim2.new(0,18,0,18); knob.AnchorPoint = Vector2.new(0.5,0.5)
     knob.Position = UDim2.new(default / MAX_VALUE, 0, 0.5, 0)
-    knob.BackgroundColor3 = Color3.fromRGB(230,230,230)
-    knob.BorderSizePixel = 0
-    knob.Parent = track
+    knob.BackgroundColor3 = Color3.fromRGB(230,230,230); knob.BorderSizePixel = 0; knob.AutoButtonColor = false
     Instance.new("UICorner", knob).CornerRadius = UDim.new(0,9)
-    knob.AutoButtonColor = false
 
     return {
-        Row = row,
-        Label = lbl,
-        ValueBox = valueBox,
-        Track = track,
-        Fill = fill,
-        Knob = knob,
-        Value = default,
-        Dragging = false,
-        SavedValue = default
+        Row = row, Label = lbl, ValueBox = valueBox, Track = track,
+        Fill = fill, Knob = knob, Value = default, Dragging = false, SavedValue = default
     }
 end
 
 local speedRow = createSliderRow(controlsFrame, 0, "Speed", DEFAULT_SPEED)
 local jumpRow = createSliderRow(controlsFrame, 44, "JumpPower", DEFAULT_JUMP)
 
--- REVERT
-local revertBtn = Instance.new("TextButton")
-revertBtn.Size = UDim2.new(0, 86, 0, 30)
-revertBtn.Position = UDim2.new(0, 12, 0, 96)
-revertBtn.BackgroundColor3 = Color3.fromRGB(110,110,110)
-revertBtn.Text = "Revert"
-revertBtn.Font = Enum.Font.GothamBold
-revertBtn.TextSize = 14
-revertBtn.TextColor3 = Color3.new(1,1,1)
-revertBtn.Parent = controlsFrame
+local revertBtn = Instance.new("TextButton", controlsFrame)
+revertBtn.Size = UDim2.new(0,86,0,30); revertBtn.Position = UDim2.new(0,12,0,96)
+revertBtn.BackgroundColor3 = Color3.fromRGB(110,110,110); revertBtn.Text = "Revert"
+revertBtn.Font = Enum.Font.GothamBold; revertBtn.TextSize = 14; revertBtn.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", revertBtn).CornerRadius = UDim.new(0,6)
 
--- INVITE BOX (non-deletable) bottom-left, auto-resizes
-local inviteBox = Instance.new("TextBox")
-inviteBox.Size = UDim2.new(0.72, 0, 0, 28)
-inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
-inviteBox.BackgroundTransparency = 0.3
-inviteBox.Text = DISCORD_INVITE
-inviteBox.ClearTextOnFocus = false
-inviteBox.Font = Enum.Font.Gotham
-inviteBox.TextSize = 14
-inviteBox.TextColor3 = Color3.new(1,1,1)
+-- Invite box (non-deletable)
+local inviteBox = Instance.new("TextBox", mainFrame)
+inviteBox.Size = UDim2.new(0.72,0,0,28); inviteBox.Position = UDim2.new(0.06,0,1,-38)
+inviteBox.BackgroundTransparency = 0.3; inviteBox.Text = DISCORD_INVITE; inviteBox.ClearTextOnFocus = false
+inviteBox.Font = Enum.Font.Gotham; inviteBox.TextSize = 14; inviteBox.TextColor3 = Color3.new(1,1,1)
 inviteBox.TextXAlignment = Enum.TextXAlignment.Left
-inviteBox.Parent = mainFrame
 Instance.new("UICorner", inviteBox).CornerRadius = UDim.new(0,6)
 
 local function resizeInviteBox()
     local pad = 18
-    local size = TextService:GetTextSize(inviteBox.Text, inviteBox.TextSize, inviteBox.Font, Vector2.new(2000, 100))
+    local size = TextService:GetTextSize(inviteBox.Text, inviteBox.TextSize, inviteBox.Font, Vector2.new(2000,100))
     local newW = math.clamp(math.ceil(size.X) + pad, 100, FRAME_W - 80)
     inviteBox.Size = UDim2.new(0, newW, 0, 28)
     inviteBox.Position = UDim2.new(0.06, 0, 1, -38)
 end
 resizeInviteBox()
+inviteBox:GetPropertyChangedSignal("Text"):Connect(function() if inviteBox.Text ~= DISCORD_INVITE then inviteBox.Text = DISCORD_INVITE; pcall(function() inviteBox:CaptureFocus(); inviteBox.SelectionStart = 1; inviteBox.CursorPosition = #inviteBox.Text + 1 end); resizeInviteBox() end end)
+inviteBox.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then pcall(function() inviteBox:CaptureFocus(); inviteBox.SelectionStart = 1; inviteBox.CursorPosition = #inviteBox.Text + 1 end) end end)
 
-inviteBox:GetPropertyChangedSignal("Text"):Connect(function()
-    if inviteBox.Text ~= DISCORD_INVITE then
-        inviteBox.Text = DISCORD_INVITE
-        pcall(function()
-            inviteBox:CaptureFocus()
-            inviteBox.SelectionStart = 1
-            inviteBox.CursorPosition = #inviteBox.Text + 1
-        end)
-        resizeInviteBox()
-    end
-end)
-
-inviteBox.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        pcall(function()
-            inviteBox:CaptureFocus()
-            inviteBox.SelectionStart = 1
-            inviteBox.CursorPosition = #inviteBox.Text + 1
-        end)
-    end
-end)
-
--- CLAMP helper
+-- Clamp helper
 local function clampPositionToScreen(px, py)
-    local camera = workspace.CurrentCamera
-    if not camera then return px, py end
-    local view = camera.ViewportSize
+    local cam = workspace.CurrentCamera
+    if not cam then return px, py end
+    local view = cam.ViewportSize
     local maxX = math.max(0, view.X - mainFrame.AbsoluteSize.X)
     local maxY = math.max(0, view.Y - mainFrame.AbsoluteSize.Y)
-    local nx = math.clamp(px, 0, maxX)
-    local ny = math.clamp(py, 0, maxY)
-    return nx, ny
+    return math.clamp(px, 0, maxX), math.clamp(py, 0, maxY)
 end
 
--- DRAG STICKER (initially inside mainFrame)
+-- Drag sticker
 local dragSticker = Instance.new("ImageButton")
-dragSticker.Size = UDim2.new(0, 30, 0, 30)
-dragSticker.Position = UDim2.new(1, -36, 1, -36)
-dragSticker.AnchorPoint = Vector2.new(0,0)
-dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
-dragSticker.Image = ""
-dragSticker.Parent = mainFrame
+dragSticker.Size = UDim2.new(0,30,0,30); dragSticker.Position = UDim2.new(1,-36,1,-36)
+dragSticker.AnchorPoint = Vector2.new(0,0); dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
+dragSticker.Image = ""; dragSticker.Parent = mainFrame
 Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
-
--- Keep original sticker position for restore
-local originalStickerParent = dragSticker.Parent
 local originalStickerPos = dragSticker.Position
 
-local isDraggingGUI = false
-local dragStartMouse = Vector2.new()
-local dragStartPos = Vector2.new()
-
--- Helper to start dragging (works whether sticker is in mainFrame or in screenGui)
-local function beginDrag(input)
+local isDraggingGUI, dragStartMouse, dragStartPos = false, Vector2.new(), Vector2.new()
+dragSticker.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         isDraggingGUI = true
-        local mpos = UserInputService:GetMouseLocation()
-        dragStartMouse = Vector2.new(mpos.X, mpos.Y)
+        local m = UserInputService:GetMouseLocation()
+        dragStartMouse = Vector2.new(m.X,m.Y)
         dragStartPos = Vector2.new(mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y)
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                isDraggingGUI = false
-            end
-        end)
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then isDraggingGUI = false end end)
     end
-end
-
-dragSticker.InputBegan:Connect(beginDrag)
-
+end)
 UserInputService.InputChanged:Connect(function(input)
     if isDraggingGUI and input.UserInputType == Enum.UserInputType.MouseMovement then
         local m = UserInputService:GetMouseLocation()
-        local delta = Vector2.new(m.X, m.Y) - dragStartMouse
+        local delta = Vector2.new(m.X,m.Y) - dragStartMouse
         local newPos = dragStartPos + delta
         local nx, ny = clampPositionToScreen(newPos.X, newPos.Y)
         mainFrame.Position = UDim2.new(0, nx, 0, ny)
-        -- if sticker is parented to screenGui we must keep it visually under/near mainFrame
         if dragSticker.Parent == screenGui then
-            -- reposition sticker to stay just below mainFrame
             dragSticker.Position = UDim2.new(0, nx + mainFrame.AbsoluteSize.X - 36, 0, ny + mainFrame.AbsoluteSize.Y + 6)
         end
     end
 end)
+UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then isDraggingGUI = false end end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDraggingGUI = false
-    end
-end)
-
--- SLIDER LOGIC (snaps to SNAP)
+-- Slider logic (snap to SNAP)
 local function enableSliderDrag(slider)
-    local track = slider.Track
-    local knob = slider.Knob
+    local track, knob = slider.Track, slider.Knob
     local dragging = false
-
-    knob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            slider.Dragging = true
-        end
-    end)
-
-    knob.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-            slider.Dragging = false
-        end
-    end)
-
+    knob.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; slider.Dragging = true end end)
+    knob.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false; slider.Dragging = false end end)
     track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             local mx = UserInputService:GetMouseLocation().X
             local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
             local raw = rel * MAX_VALUE
             local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
-            slider.Value = value
-            slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
-            slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
-            slider.SavedValue = value
+            slider.Value = value; slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
+            slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
         end
     end)
-
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local mx = UserInputService:GetMouseLocation().X
             local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
             local raw = rel * MAX_VALUE
             local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
-            slider.Value = value
-            slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
-            slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0)
-            slider.SavedValue = value
+            slider.Value = value; slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
+            slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
         end
     end)
 end
+enableSliderDrag(speedRow); enableSliderDrag(jumpRow)
 
-enableSliderDrag(speedRow)
-enableSliderDrag(jumpRow)
-
--- TEXTBOX live filter & FocusLost validation
-local function sanitizeNumberString(s)
-    local cleaned = s:gsub("%D", "")
+-- helpers: sanitize and format
+local function sanitizeNumberStringAllowDot(s)
+    -- allow digits and at most one dot
+    local cleaned = s:gsub("[^%d%.]", "")
+    -- remove extra dots (keep first)
+    local firstDot = cleaned:find("%.")
+    if firstDot then
+        local before = cleaned:sub(1, firstDot)
+        local after = cleaned:sub(firstDot+1):gsub("%.", "")
+        cleaned = before .. after
+    end
     if cleaned == "" then return nil end
-    return tonumber(cleaned)
+    local n = tonumber(cleaned)
+    return n, cleaned
 end
 
--- live filter that preserves cursor
-local function liveFilterDigits(box)
+local function formatNumber(n)
+    if type(n) ~= "number" then return "0" end
+    local s = tostring(n)
+    if s:find("%.") then
+        -- trim trailing zeros
+        s = s:gsub("(%.%d-)0+$", "%1")
+        s = s:gsub("%.$", "")
+    end
+    return s
+end
+
+-- autosize text to fit box
+local function fitTextToBox(box, text)
+    local maxSize, minSize = 14, 8
+    if not text then text = box.Text end
+    local w = box.AbsoluteSize.X
+    if w <= 0 then return end
+    local size = maxSize
+    local pad = 6
+    -- try to increase if possible
+    while size < maxSize do
+        local ts = TextService:GetTextSize(text, size+1, box.Font, Vector2.new(2000,100))
+        if ts.X <= w - pad then size = size + 1 else break end
+    end
+    -- shrink until fits
+    while size > minSize do
+        local ts = TextService:GetTextSize(text, size, box.Font, Vector2.new(2000,100))
+        if ts.X <= w - pad then break end
+        size = size - 1
+    end
+    box.TextSize = size
+end
+
+-- live-digit+dot filter preserving cursor
+local function liveFilterDigitsAndDot(box)
     box:GetPropertyChangedSignal("Text"):Connect(function()
         local text = box.Text or ""
-        local cleaned = text:gsub("%D", "")
+        local cleaned = text:gsub("[^%d%.]", "")
+        -- remove extra dots
+        local firstDot = cleaned:find("%.")
+        if firstDot then
+            local before = cleaned:sub(1, firstDot)
+            local after = cleaned:sub(firstDot+1):gsub("%.", "")
+            cleaned = before .. after
+        end
         if cleaned ~= text then
             local cur = 1
             pcall(function() cur = box.CursorPosition end)
-            -- compute new cursor pos after removal
             local removed = text:len() - cleaned:len()
             box.Text = cleaned
             pcall(function()
@@ -375,48 +282,51 @@ local function liveFilterDigits(box)
                 box.CursorPosition = newCur
             end)
         end
+        -- adapt size live
+        pcall(function() fitTextToBox(box, box.Text) end)
     end)
+    -- also refit on absolute size changes
+    box:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() pcall(function() fitTextToBox(box, box.Text) end) end)
 end
 
+-- hook value boxes: validate on focus lost; preserve typed input while typing
 local function hookValueBox(slider)
     local box = slider.ValueBox
-    -- live filter digits, but do not override while typing other than removing non-digits gently
-    liveFilterDigits(box)
-
-    -- validate on focus lost (or enter) — revert if outside range
+    liveFilterDigitsAndDot(box)
     box.FocusLost:Connect(function(enterPressed)
         local txt = box.Text or ""
-        local num = sanitizeNumberString(txt)
+        local num, cleaned = sanitizeNumberStringAllowDot(txt)
         if not num then
-            -- revert to last saved
-            box.Text = tostring(math.floor(slider.SavedValue + 0.5))
+            box.Text = formatNumber(slider.SavedValue)
             slider.Value = slider.SavedValue
             slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 0.5, 0)
+            fitTextToBox(box, box.Text)
             return
         end
-        num = math.floor(num + 0.5)
-        if num < 0 or num > MAX_VALUE then
-            -- invalid -> revert
-            box.Text = tostring(math.floor(slider.SavedValue + 0.5))
+        -- clamp and accept decimal
+        local clamped = math.clamp(num, 0, MAX_VALUE)
+        if clamped ~= num then
+            -- invalid range -> revert
+            box.Text = formatNumber(slider.SavedValue)
             slider.Value = slider.SavedValue
             slider.Fill.Size = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 1, 0)
             slider.Knob.Position = UDim2.new(slider.SavedValue / MAX_VALUE, 0, 0.5, 0)
+            fitTextToBox(box, box.Text)
             return
         end
-        -- valid: accept exact typed number (no extra snapping), update saved
-        slider.Value = num
-        slider.SavedValue = num
-        slider.Fill.Size = UDim2.new(num / MAX_VALUE, 0, 1, 0)
-        slider.Knob.Position = UDim2.new(num / MAX_VALUE, 0, 0.5, 0)
-        box.Text = tostring(num)
+        slider.Value = clamped
+        slider.SavedValue = clamped
+        slider.Fill.Size = UDim2.new(clamped / MAX_VALUE, 0, 1, 0)
+        slider.Knob.Position = UDim2.new(clamped / MAX_VALUE, 0, 0.5, 0)
+        box.Text = formatNumber(clamped)
+        fitTextToBox(box, box.Text)
     end)
 end
 
-hookValueBox(speedRow)
-hookValueBox(jumpRow)
+hookValueBox(speedRow); hookValueBox(jumpRow)
 
--- APPLY values to humanoid (do NOT overwrite textbox while focused)
+-- apply values but don't override while focused
 local function applyValues()
     local char = player.Character
     if not char then return end
@@ -426,21 +336,14 @@ local function applyValues()
     if type(jumpRow.Value) ~= "number" then jumpRow.Value = DEFAULT_JUMP end
     hum.WalkSpeed = math.clamp(speedRow.Value, 0, MAX_VALUE)
     hum.JumpPower = math.clamp(jumpRow.Value, 0, MAX_VALUE)
-    -- update boxes only if user not typing
-    if not speedRow.ValueBox:IsFocused() then
-        speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
-    end
-    if not jumpRow.ValueBox:IsFocused() then
-        jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
-    end
+    if not speedRow.ValueBox:IsFocused() then speedRow.ValueBox.Text = formatNumber(speedRow.Value); fitTextToBox(speedRow.ValueBox) end
+    if not jumpRow.ValueBox:IsFocused() then jumpRow.ValueBox.Text = formatNumber(jumpRow.Value); fitTextToBox(jumpRow.ValueBox) end
 end
 
--- REVERT
+-- revert
 revertBtn.MouseButton1Click:Connect(function()
-    speedRow.Value = DEFAULT_SPEED
-    jumpRow.Value = DEFAULT_JUMP
-    speedRow.SavedValue = DEFAULT_SPEED
-    jumpRow.SavedValue = DEFAULT_JUMP
+    speedRow.Value = DEFAULT_SPEED; jumpRow.Value = DEFAULT_JUMP
+    speedRow.SavedValue = DEFAULT_SPEED; jumpRow.SavedValue = DEFAULT_JUMP
     speedRow.Fill.Size = UDim2.new(DEFAULT_SPEED / MAX_VALUE, 0, 1, 0)
     jumpRow.Fill.Size = UDim2.new(DEFAULT_JUMP / MAX_VALUE, 0, 1, 0)
     speedRow.Knob.Position = UDim2.new(DEFAULT_SPEED / MAX_VALUE, 0, 0.5, 0)
@@ -448,37 +351,28 @@ revertBtn.MouseButton1Click:Connect(function()
     applyValues()
 end)
 
--- MINIMIZE behavior: hide invite; move dragSticker outside MAIN so it's still usable
+-- minimize behavior (invite hide + sticker move)
 local minimized = false
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     controlsFrame.Visible = not minimized
     inviteBox.Visible = not minimized
-
     if minimized then
-        -- shrink main frame
         mainFrame.Size = UDim2.new(0, FRAME_W, 0, 40)
-        -- move sticker to screenGui and place just below mainFrame so it's still clickable
-        local absX = mainFrame.AbsolutePosition.X
-        local absY = mainFrame.AbsolutePosition.Y
+        -- move sticker outside mainFrame so it remains usable
         dragSticker.Parent = screenGui
-        dragSticker.AnchorPoint = Vector2.new(0, 0)
+        local absX, absY = mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y
         dragSticker.Position = UDim2.new(0, absX + mainFrame.AbsoluteSize.X - 36, 0, absY + mainFrame.AbsoluteSize.Y + 6)
     else
-        -- restore main frame size
         mainFrame.Size = UDim2.new(0, FRAME_W, 0, FRAME_H)
-        -- restore sticker inside mainFrame at original position
         dragSticker.Parent = mainFrame
         dragSticker.Position = originalStickerPos
     end
 end)
 
--- CLOSE
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
+closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
--- Initialize visuals
+-- initialize visuals
 speedRow.Value = speedRow.Value or DEFAULT_SPEED
 jumpRow.Value = jumpRow.Value or DEFAULT_JUMP
 speedRow.SavedValue = speedRow.SavedValue or speedRow.Value
@@ -487,10 +381,11 @@ speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
 jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
 speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
 jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
-speedRow.ValueBox.Text = tostring(math.floor(speedRow.Value + 0.5))
-jumpRow.ValueBox.Text = tostring(math.floor(jumpRow.Value + 0.5))
+speedRow.ValueBox.Text = formatNumber(speedRow.Value)
+jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
+fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
 
--- Lightweight apply loop (keeps humanoid in sync)
+-- lightweight loop
 local running = true
 spawn(function()
     while running and screenGui.Parent do
@@ -499,18 +394,12 @@ spawn(function()
     end
 end)
 
-screenGui.AncestryChanged:Connect(function()
-    if not screenGui:IsDescendantOf(game) then running = false end
-end)
+screenGui.AncestryChanged:Connect(function() if not screenGui:IsDescendantOf(game) then running = false end end)
 
--- Keep GUI clamped to screen; if sticker is parented to screenGui keep sticker near mainFrame
 RunService:BindToRenderStep("ClampGUIPosition", Enum.RenderPriority.Camera.Value + 1, function()
     local pos = mainFrame.AbsolutePosition
     local nx, ny = clampPositionToScreen(pos.X, pos.Y)
-    if nx ~= pos.X or ny ~= pos.Y then
-        mainFrame.Position = UDim2.new(0, nx, 0, ny)
-    end
-    -- if sticker is screen-level, reposition it relative to mainFrame absolute position
+    if nx ~= pos.X or ny ~= pos.Y then mainFrame.Position = UDim2.new(0, nx, 0, ny) end
     if dragSticker.Parent == screenGui then
         local sx = mainFrame.AbsolutePosition.X + mainFrame.AbsoluteSize.X - 36
         local sy = mainFrame.AbsolutePosition.Y + mainFrame.AbsoluteSize.Y + 6
