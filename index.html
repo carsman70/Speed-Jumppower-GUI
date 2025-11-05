@@ -16,13 +16,6 @@ local MAX_VALUE = 1000
 local SNAP = 5                -- snapping every 5 units
 local DISCORD_INVITE = "https://discord.gg/Gq2nNUac4"
 
--- Create persistent ScreenGui and make it less intrusive (lowered DisplayOrder)
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "LuxuryPersistentGUI"
-screenGui.ResetOnSpawn = false
-screenGui.DisplayOrder = 10  -- lowered so it's not always the absolute topmost
-screenGui.Parent = playerGui
-
 -- FRAME
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame")
