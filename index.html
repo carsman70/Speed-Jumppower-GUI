@@ -1,10 +1,11 @@
--- ScriptBlock — updated: new discord invite + drag-icon on drag sticker
+-- ScriptBlock — decal applied to drag sticker (uses decal id 5172066983)
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TextService = game:GetService("TextService")
+local ContentProvider = game:GetService("ContentProvider")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -14,11 +15,11 @@ local DEFAULT_JUMP = 50
 local MAX_VALUE = 1000
 local SNAP = 5
 
--- <<< UPDATE: new invite link requested >>> 
+-- Updated discord invite
 local DISCORD_INVITE = "https://discord.gg/HbW9mRJBC"
 
-
-local DRAG_ICON_IMAGE = "5172066983"  
+-- decal id provided by you (inserted)
+local DRAG_ICON_IMAGE = "rbxassetid://5172066983"
 
 -- create ScreenGui
 local screenGui = Instance.new("ScreenGui")
@@ -27,7 +28,7 @@ screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1000
 screenGui.Parent = playerGui
 
--- main UI (kept identical visually)
+-- main UI
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Name = "MainFrame"
@@ -163,7 +164,7 @@ dragSticker.Image = ""; dragSticker.Parent = mainFrame
 Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
 local originalStickerPos = dragSticker.Position
 
--- <<< NEW: Image placed on top of dragSticker, auto-fit to sticker size >>>
+-- ImageLabel on top of the sticker
 local dragIcon = Instance.new("ImageLabel")
 dragIcon.Name = "DragIcon"
 dragIcon.Size = UDim2.new(1, 0, 1, 0)
@@ -171,15 +172,20 @@ dragIcon.Position = UDim2.new(0, 0, 0, 0)
 dragIcon.BackgroundTransparency = 1
 dragIcon.ScaleType = Enum.ScaleType.Fit
 dragIcon.Parent = dragSticker
-if DRAG_ICON_IMAGE ~= "" then
-    dragIcon.Image = DRAG_ICON_IMAGE
-else
-    dragIcon.Image = "" -- no image until you set DRAG_ICON_IMAGE above
-end
--- ensure the icon doesn't block input to the sticker (so dragging still works)
+dragIcon.Image = DRAG_ICON_IMAGE
+dragIcon.ImageTransparency = 0
+dragIcon.Visible = true
+dragIcon.ZIndex = dragSticker.ZIndex + 2
+-- do not block input
 dragIcon.Active = false
 dragIcon.Selectable = false
-dragIcon.ZIndex = dragSticker.ZIndex + 1
+
+-- preload image to make it appear reliably
+if DRAG_ICON_IMAGE ~= "" then
+    pcall(function()
+        ContentProvider:PreloadAsync({dragIcon})
+    end)
+end
 
 local isDraggingGUI = false
 local dragStartMouse = Vector2.new()
@@ -209,7 +215,6 @@ UserInputService.InputChanged:Connect(function(input)
         local nx, ny = clampPositionToScreen(newPos.X, newPos.Y)
         mainFrame.Position = UDim2.new(0, nx, 0, ny)
         if dragSticker.Parent == screenGui then
-            -- reposition sticker (and its child dragIcon) to stay just below/near mainFrame
             dragSticker.Position = UDim2.new(0, nx + mainFrame.AbsoluteSize.X - 36, 0, ny + mainFrame.AbsoluteSize.Y + 6)
         end
     end
@@ -251,7 +256,8 @@ end
 
 enableSliderDrag(speedRow); enableSliderDrag(jumpRow)
 
--- helpers: sanitize and format (allow decimal)
+-- helpers and textbox handling left unchanged (decimals allowed, auto-fit, 0..1000 validation)
+
 local function sanitizeNumberStringAllowDot(s)
     local cleaned = s:gsub("[^%d%.]", "")
     local firstDot = cleaned:find("%.")
@@ -275,7 +281,6 @@ local function formatNumber(n)
     return s
 end
 
--- autosize text to fit box
 local function fitTextToBox(box, text)
     local maxSize, minSize = 14, 8
     if not text then text = box.Text end
@@ -295,7 +300,6 @@ local function fitTextToBox(box, text)
     box.TextSize = size
 end
 
--- live-digit+dot filter preserving cursor
 local function liveFilterDigitsAndDot(box)
     box:GetPropertyChangedSignal("Text"):Connect(function()
         local text = box.Text or ""
@@ -321,7 +325,6 @@ local function liveFilterDigitsAndDot(box)
     box:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() pcall(function() fitTextToBox(box, box.Text) end) end)
 end
 
--- hook value boxes: validate on focus lost; preserve typed input while typing
 local function hookValueBox(slider)
     local box = slider.ValueBox
     liveFilterDigitsAndDot(box)
@@ -356,7 +359,6 @@ end
 
 hookValueBox(speedRow); hookValueBox(jumpRow)
 
--- apply values but don't override while focused
 local function applyValues()
     local char = player.Character
     if not char then return end
@@ -370,7 +372,6 @@ local function applyValues()
     if not jumpRow.ValueBox:IsFocused() then jumpRow.ValueBox.Text = formatNumber(jumpRow.Value); fitTextToBox(jumpRow.ValueBox) end
 end
 
--- revert
 revertBtn.MouseButton1Click:Connect(function()
     speedRow.Value = DEFAULT_SPEED; jumpRow.Value = DEFAULT_JUMP
     speedRow.SavedValue = DEFAULT_SPEED; jumpRow.SavedValue = DEFAULT_JUMP
@@ -381,7 +382,7 @@ revertBtn.MouseButton1Click:Connect(function()
     applyValues()
 end)
 
--- minimize behavior (invite hide + sticker move)
+-- minimize behavior
 local minimized = false
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
