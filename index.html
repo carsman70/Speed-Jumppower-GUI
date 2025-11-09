@@ -1,4 +1,4 @@
--- ScriptBlock — Add Deactivate/Activate toggle + robust capture of game defaults
+-- ScriptBlock — Deactivate reminder ("reset") right of the Deactivate button
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
@@ -140,6 +140,21 @@ deactivateBtn.TextSize = 14
 deactivateBtn.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", deactivateBtn).CornerRadius = UDim.new(0,6)
 
+-- <-- NEW: reset reminder label to the right of deactivateBtn (white text). Hidden by default.
+local resetReminder = Instance.new("TextLabel", controlsFrame)
+resetReminder.Size = UDim2.new(0, 60, 0, 30)
+-- position it 8 pixels to the right of deactivateBtn (deactivateBtn at X=110, width=110 => right x ~220)
+resetReminder.Position = UDim2.new(0, 230, 0, 96)
+resetReminder.BackgroundTransparency = 1
+resetReminder.Text = "reset"
+resetReminder.Font = Enum.Font.GothamBold
+resetReminder.TextSize = 14
+resetReminder.TextColor3 = Color3.new(1,1,1)
+resetReminder.TextXAlignment = Enum.TextXAlignment.Left
+resetReminder.Visible = false
+
+Instance.new("UICorner", resetReminder).CornerRadius = UDim.new(0,6)
+
 -- Invite box (non-deletable)
 local inviteBox = Instance.new("TextBox", mainFrame)
 inviteBox.Size = UDim2.new(0.72,0,0,28); inviteBox.Position = UDim2.new(0.06,0,1,-38)
@@ -188,7 +203,6 @@ darkOverlay.BackgroundTransparency = 0.6 -- "a bit darker"
 darkOverlay.ZIndex = mainFrame.ZIndex + 50
 darkOverlay.Visible = false
 darkOverlay.ClipsDescendants = true
--- Ensure overlay doesn't block interactions with controls by making it non-Active and low ZIndex for inputs
 darkOverlay.Active = false
 darkOverlay.Selectable = false
 
@@ -440,9 +454,13 @@ deactivateBtn.MouseButton1Click:Connect(function()
         deactivateBtn.Text = "Activate"
         -- show overlay to darken gui a bit
         darkOverlay.Visible = true
+        -- show the reset reminder label
+        resetReminder.Visible = true
     else
         deactivateBtn.Text = "Deactivate"
         darkOverlay.Visible = false
+        -- hide the reset reminder label
+        resetReminder.Visible = false
         -- when reactivating, immediately apply the current slider values to humanoid
         local char = player.Character
         if char then
@@ -461,7 +479,9 @@ minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     controlsFrame.Visible = not minimized
     inviteBox.Visible = not minimized
+    -- also hide resetReminder when minimized (keeps UI tidy)
     if minimized then
+        resetReminder.Visible = false
         mainFrame.Size = UDim2.new(0, FRAME_W, 0, 40)
         dragSticker.Parent = screenGui
         local absX, absY = mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y
@@ -470,6 +490,8 @@ minBtn.MouseButton1Click:Connect(function()
         mainFrame.Size = UDim2.new(0, FRAME_W, 0, FRAME_H)
         dragSticker.Parent = mainFrame
         dragSticker.Position = originalStickerPos
+        -- restore resetReminder visibility if deactivated
+        if deactivated then resetReminder.Visible = true end
     end
 end)
 
