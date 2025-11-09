@@ -1,4 +1,4 @@
--- ScriptBlock — Fixed: capture game defaults & Revert resets to them
+-- ScriptBlock — Add Deactivate/Activate toggle + robust capture of game defaults
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
@@ -17,7 +17,7 @@ local GAME_DEFAULT_JUMPPOWER = 50
 local MAX_VALUE = 1000
 local SNAP = 5
 
--- Updated invite (kept as you asked previously)
+-- Updated invite
 local DISCORD_INVITE = "https://discord.gg/9mTKFv5HR"
 
 -- create ScreenGui
@@ -27,7 +27,7 @@ screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1000
 screenGui.Parent = playerGui
 
--- main UI (unchanged)
+-- main UI (unchanged visually)
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Name = "MainFrame"
@@ -114,7 +114,6 @@ local function createSliderRow(parent, y, labelText, default)
     return {
         Row = row, Label = lbl, ValueBox = valueBox, Track = track,
         Fill = fill, Knob = knob, Value = default, Dragging = false, SavedValue = default,
-        -- store default placeholder separately (may be replaced later)
         DefaultPlaceholder = default
     }
 end
@@ -123,11 +122,23 @@ end
 local speedRow = createSliderRow(controlsFrame, 0, "Speed", GAME_DEFAULT_WALKSPEED)
 local jumpRow = createSliderRow(controlsFrame, 44, "JumpPower", GAME_DEFAULT_JUMPPOWER)
 
+-- Revert button
 local revertBtn = Instance.new("TextButton", controlsFrame)
 revertBtn.Size = UDim2.new(0,86,0,30); revertBtn.Position = UDim2.new(0,12,0,96)
 revertBtn.BackgroundColor3 = Color3.fromRGB(110,110,110); revertBtn.Text = "Revert"
 revertBtn.Font = Enum.Font.GothamBold; revertBtn.TextSize = 14; revertBtn.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", revertBtn).CornerRadius = UDim.new(0,6)
+
+-- Deactivate / Activate toggle button (to the right of Revert)
+local deactivateBtn = Instance.new("TextButton", controlsFrame)
+deactivateBtn.Size = UDim2.new(0,110,0,30)
+deactivateBtn.Position = UDim2.new(0, 110, 0, 96) -- right of revert (12 + 86 + ~12 spacing)
+deactivateBtn.BackgroundColor3 = Color3.fromRGB(110,110,110)
+deactivateBtn.Text = "Deactivate"
+deactivateBtn.Font = Enum.Font.GothamBold
+deactivateBtn.TextSize = 14
+deactivateBtn.TextColor3 = Color3.new(1,1,1)
+Instance.new("UICorner", deactivateBtn).CornerRadius = UDim.new(0,6)
 
 -- Invite box (non-deletable)
 local inviteBox = Instance.new("TextBox", mainFrame)
@@ -166,6 +177,21 @@ dragSticker.Image = ""; dragSticker.Parent = mainFrame
 Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
 local originalStickerPos = dragSticker.Position
 
+-- Optional decal code skipped here (kept empty to match "before decals" state)
+
+-- Create a dark overlay (hidden normally) to darken the whole GUI when deactivated
+local darkOverlay = Instance.new("Frame", mainFrame)
+darkOverlay.Size = UDim2.new(1,0,1,0)
+darkOverlay.Position = UDim2.new(0,0,0,0)
+darkOverlay.BackgroundColor3 = Color3.fromRGB(0,0,0)
+darkOverlay.BackgroundTransparency = 0.6 -- "a bit darker"
+darkOverlay.ZIndex = mainFrame.ZIndex + 50
+darkOverlay.Visible = false
+darkOverlay.ClipsDescendants = true
+-- Ensure overlay doesn't block interactions with controls by making it non-Active and low ZIndex for inputs
+darkOverlay.Active = false
+darkOverlay.Selectable = false
+
 -- Robust dragging for GUI (works with touch & mouse)
 local isDraggingGUI = false
 local dragStartMouse = Vector2.new()
@@ -177,7 +203,6 @@ dragSticker.InputBegan:Connect(function(input)
         local pos = input.Position or UserInputService:GetMouseLocation()
         dragStartMouse = Vector2.new(pos.X, pos.Y)
         dragStartPos = Vector2.new(mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y)
-        -- listen for input end on this input object
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 isDraggingGUI = false
@@ -211,11 +236,9 @@ local function enableSliderDrag(slider)
     local track, knob = slider.Track, slider.Knob
     local dragging = false
 
-    -- when knob touched/clicked, start dragging
     knob.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            -- stop dragging when that touch ends
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -224,7 +247,6 @@ local function enableSliderDrag(slider)
         end
     end)
 
-    -- clicking/tapping the bar moves knob there
     track.InputBegan:Connect(function(input)
         if not (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then return end
         local pos = input.Position or UserInputService:GetMouseLocation()
@@ -236,7 +258,6 @@ local function enableSliderDrag(slider)
         slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
     end)
 
-    -- update while dragging using InputChanged
     UserInputService.InputChanged:Connect(function(input)
         if not dragging then return end
         if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
@@ -358,16 +379,27 @@ end
 
 hookValueBox(speedRow); hookValueBox(jumpRow)
 
--- apply values but don't override while focused
+-- Deactivated flag controls whether script applies values to Humanoid
+local deactivated = false
+
+-- apply values but don't override while focused or when deactivated
 local function applyValues()
     local char = player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-    -- ensure the slider values exist
+    -- if slider values missing, initialize from humanoid or captured defaults
     if type(speedRow.Value) ~= "number" then speedRow.Value = hum and hum.WalkSpeed or GAME_DEFAULT_WALKSPEED end
     if type(jumpRow.Value) ~= "number" then jumpRow.Value = hum and hum.JumpPower or GAME_DEFAULT_JUMPPOWER end
 
+    -- If deactivated, do not set humanoid values; only keep UI in sync
+    if deactivated then
+        if not speedRow.ValueBox:IsFocused() then speedRow.ValueBox.Text = formatNumber(speedRow.Value); fitTextToBox(speedRow.ValueBox) end
+        if not jumpRow.ValueBox:IsFocused() then jumpRow.ValueBox.Text = formatNumber(jumpRow.Value); fitTextToBox(jumpRow.ValueBox) end
+        return
+    end
+
+    -- Normal behavior: set humanoid values
     hum.WalkSpeed = math.clamp(speedRow.Value, 0, MAX_VALUE)
     hum.JumpPower = math.clamp(jumpRow.Value, 0, MAX_VALUE)
 
@@ -390,9 +422,9 @@ revertBtn.MouseButton1Click:Connect(function()
     speedRow.Knob.Position = UDim2.new(defaultSpeed / MAX_VALUE, 0, 0.5, 0)
     jumpRow.Knob.Position = UDim2.new(defaultJump / MAX_VALUE, 0, 0.5, 0)
 
-    -- apply to current humanoid immediately if present
+    -- apply to current humanoid immediately if present AND ONLY if not deactivated
     local char = player.Character
-    if char then
+    if char and not deactivated then
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
             hum.WalkSpeed = math.clamp(defaultSpeed, 0, MAX_VALUE)
@@ -401,7 +433,29 @@ revertBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Minimize behavior (invite hide + sticker move)
+-- Deactivate/Activate toggle: swap text + show overlay + stop applying values
+deactivateBtn.MouseButton1Click:Connect(function()
+    deactivated = not deactivated
+    if deactivated then
+        deactivateBtn.Text = "Activate"
+        -- show overlay to darken gui a bit
+        darkOverlay.Visible = true
+    else
+        deactivateBtn.Text = "Deactivate"
+        darkOverlay.Visible = false
+        -- when reactivating, immediately apply the current slider values to humanoid
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.WalkSpeed = math.clamp(speedRow.Value or GAME_DEFAULT_WALKSPEED, 0, MAX_VALUE)
+                hum.JumpPower = math.clamp(jumpRow.Value or GAME_DEFAULT_JUMPPOWER, 0, MAX_VALUE)
+            end
+        end
+    end
+end)
+
+-- Minimize behaviour (invite hide + sticker move)
 local minimized = false
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
