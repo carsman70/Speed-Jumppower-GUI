@@ -1,4 +1,4 @@
--- ScriptBlock — decimals + auto-fit + update interval 0.04
+-- ScriptBlock — Touch + mouse robust dragging | use game's default WalkSpeed & JumpPower | updated invite
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
@@ -9,10 +9,14 @@ local TextService = game:GetService("TextService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local DEFAULT_SPEED = 16
-local DEFAULT_JUMP = 50
+-- We'll read the game's current defaults from the player's humanoid when available
+local GAME_DEFAULT_WALKSPEED = 16
+local GAME_DEFAULT_JUMPPOWER = 50
+
 local MAX_VALUE = 1000
 local SNAP = 5
+
+-- Updated invite
 local DISCORD_INVITE = "https://discord.gg/9mTKFv5HR"
 
 -- create ScreenGui
@@ -22,7 +26,7 @@ screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1000
 screenGui.Parent = playerGui
 
--- main UI (kept identical visually)
+-- main UI (visuals preserved)
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Name = "MainFrame"
@@ -112,8 +116,9 @@ local function createSliderRow(parent, y, labelText, default)
     }
 end
 
-local speedRow = createSliderRow(controlsFrame, 0, "Speed", DEFAULT_SPEED)
-local jumpRow = createSliderRow(controlsFrame, 44, "JumpPower", DEFAULT_JUMP)
+-- We'll create rows with temporary defaults; they'll be updated to game's defaults when character loads
+local speedRow = createSliderRow(controlsFrame, 0, "Speed", GAME_DEFAULT_WALKSPEED)
+local jumpRow = createSliderRow(controlsFrame, 44, "JumpPower", GAME_DEFAULT_JUMPPOWER)
 
 local revertBtn = Instance.new("TextButton", controlsFrame)
 revertBtn.Size = UDim2.new(0,86,0,30); revertBtn.Position = UDim2.new(0,12,0,96)
@@ -150,7 +155,7 @@ local function clampPositionToScreen(px, py)
     return math.clamp(px, 0, maxX), math.clamp(py, 0, maxY)
 end
 
--- Drag sticker
+-- Drag sticker (small handle in bottom-right)
 local dragSticker = Instance.new("ImageButton")
 dragSticker.Size = UDim2.new(0,30,0,30); dragSticker.Position = UDim2.new(1,-36,1,-36)
 dragSticker.AnchorPoint = Vector2.new(0,0); dragSticker.BackgroundColor3 = Color3.fromRGB(70,70,70)
@@ -158,57 +163,90 @@ dragSticker.Image = ""; dragSticker.Parent = mainFrame
 Instance.new("UICorner", dragSticker).CornerRadius = UDim.new(0,6)
 local originalStickerPos = dragSticker.Position
 
-local isDraggingGUI, dragStartMouse, dragStartPos = false, Vector2.new(), Vector2.new()
+-- Robust dragging for GUI (works with touch & mouse)
+local isDraggingGUI = false
+local dragStartMouse = Vector2.new()
+local dragStartPos = Vector2.new()
+
 dragSticker.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         isDraggingGUI = true
-        local m = UserInputService:GetMouseLocation()
-        dragStartMouse = Vector2.new(m.X,m.Y)
+        local pos = input.Position or UserInputService:GetMouseLocation()
+        dragStartMouse = Vector2.new(pos.X, pos.Y)
         dragStartPos = Vector2.new(mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y)
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then isDraggingGUI = false end end)
+        -- listen for input end on this input object
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                isDraggingGUI = false
+            end
+        end)
     end
 end)
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingGUI and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local m = UserInputService:GetMouseLocation()
-        local delta = Vector2.new(m.X,m.Y) - dragStartMouse
-        local newPos = dragStartPos + delta
-        local nx, ny = clampPositionToScreen(newPos.X, newPos.Y)
-        mainFrame.Position = UDim2.new(0, nx, 0, ny)
-        if dragSticker.Parent == screenGui then
-            dragSticker.Position = UDim2.new(0, nx + mainFrame.AbsoluteSize.X - 36, 0, ny + mainFrame.AbsoluteSize.Y + 6)
-        end
-    end
-end)
-UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then isDraggingGUI = false end end)
 
--- Slider logic (snap to SNAP)
+UserInputService.InputChanged:Connect(function(input)
+    if not isDraggingGUI then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    local pos = input.Position or UserInputService:GetMouseLocation()
+    local m = Vector2.new(pos.X, pos.Y)
+    local delta = m - dragStartMouse
+    local newPos = dragStartPos + delta
+    local nx, ny = clampPositionToScreen(newPos.X, newPos.Y)
+    mainFrame.Position = UDim2.new(0, nx, 0, ny)
+    if dragSticker.Parent == screenGui then
+        dragSticker.Position = UDim2.new(0, nx + mainFrame.AbsoluteSize.X - 36, 0, ny + mainFrame.AbsoluteSize.Y + 6)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingGUI = false
+    end
+end)
+
+-- Slider dragging: support touch + mouse robustly
 local function enableSliderDrag(slider)
     local track, knob = slider.Track, slider.Knob
     local dragging = false
-    knob.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; slider.Dragging = true end end)
-    knob.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false; slider.Dragging = false end end)
-    track.InputBegan:Connect(function(input)
+
+    -- when knob touched/clicked, start dragging
+    knob.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local mx = UserInputService:GetMouseLocation().X
-            local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-            local raw = rel * MAX_VALUE
-            local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
-            slider.Value = value; slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
-            slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
+            dragging = true
+            -- stop dragging when that touch ends
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
         end
     end)
+
+    -- clicking/tapping the bar moves knob there
+    track.InputBegan:Connect(function(input)
+        if not (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then return end
+        local pos = input.Position or UserInputService:GetMouseLocation()
+        local mx = pos.X
+        local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
+        local raw = rel * MAX_VALUE
+        local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
+        slider.Value = value; slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
+        slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
+    end)
+
+    -- update while dragging using InputChanged
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local mx = UserInputService:GetMouseLocation().X
-            local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
-            local raw = rel * MAX_VALUE
-            local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
-            slider.Value = value; slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
-            slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
-        end
+        if not dragging then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local pos = input.Position or UserInputService:GetMouseLocation()
+        local mx = pos.X
+        local rel = math.clamp((mx - track.AbsolutePosition.X) / math.max(1, track.AbsoluteSize.X), 0, 1)
+        local raw = rel * MAX_VALUE
+        local value = math.floor((raw + SNAP/2) / SNAP) * SNAP
+        slider.Value = value; slider.Fill.Size = UDim2.new(value / MAX_VALUE, 0, 1, 0)
+        slider.Knob.Position = UDim2.new(value / MAX_VALUE, 0, 0.5, 0); slider.SavedValue = value
     end)
 end
+
 enableSliderDrag(speedRow); enableSliderDrag(jumpRow)
 
 -- helpers: sanitize and format
@@ -296,6 +334,7 @@ local function hookValueBox(slider)
             fitTextToBox(box, box.Text)
             return
         end
+        -- clamp and accept decimal
         local clamped = math.clamp(num, 0, MAX_VALUE)
         if clamped ~= num then
             box.Text = formatNumber(slider.SavedValue)
@@ -322,22 +361,30 @@ local function applyValues()
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
-    if type(speedRow.Value) ~= "number" then speedRow.Value = DEFAULT_SPEED end
-    if type(jumpRow.Value) ~= "number" then jumpRow.Value = DEFAULT_JUMP end
+    -- ensure the slider values exist
+    if type(speedRow.Value) ~= "number" then speedRow.Value = hum and hum.WalkSpeed or GAME_DEFAULT_WALKSPEED end
+    if type(jumpRow.Value) ~= "number" then jumpRow.Value = hum and hum.JumpPower or GAME_DEFAULT_JUMPPOWER end
+
     hum.WalkSpeed = math.clamp(speedRow.Value, 0, MAX_VALUE)
     hum.JumpPower = math.clamp(jumpRow.Value, 0, MAX_VALUE)
+
     if not speedRow.ValueBox:IsFocused() then speedRow.ValueBox.Text = formatNumber(speedRow.Value); fitTextToBox(speedRow.ValueBox) end
     if not jumpRow.ValueBox:IsFocused() then jumpRow.ValueBox.Text = formatNumber(jumpRow.Value); fitTextToBox(jumpRow.ValueBox) end
 end
 
--- revert
+-- Revert: revert to game's defaults (read from GAME_DEFAULT_*)
 revertBtn.MouseButton1Click:Connect(function()
-    speedRow.Value = DEFAULT_SPEED; jumpRow.Value = DEFAULT_JUMP
-    speedRow.SavedValue = DEFAULT_SPEED; jumpRow.SavedValue = DEFAULT_JUMP
-    speedRow.Fill.Size = UDim2.new(DEFAULT_SPEED / MAX_VALUE, 0, 1, 0)
-    jumpRow.Fill.Size = UDim2.new(DEFAULT_JUMP / MAX_VALUE, 0, 1, 0)
-    speedRow.Knob.Position = UDim2.new(DEFAULT_SPEED / MAX_VALUE, 0, 0.5, 0)
-    jumpRow.Knob.Position = UDim2.new(DEFAULT_JUMP / MAX_VALUE, 0, 0.5, 0)
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local defaultSpeed = hum and hum.WalkSpeed or GAME_DEFAULT_WALKSPEED
+    local defaultJump = hum and hum.JumpPower or GAME_DEFAULT_JUMPPOWER
+
+    speedRow.Value = defaultSpeed; jumpRow.Value = defaultJump
+    speedRow.SavedValue = defaultSpeed; jumpRow.SavedValue = defaultJump
+    speedRow.Fill.Size = UDim2.new(defaultSpeed / MAX_VALUE, 0, 1, 0)
+    jumpRow.Fill.Size = UDim2.new(defaultJump / MAX_VALUE, 0, 1, 0)
+    speedRow.Knob.Position = UDim2.new(defaultSpeed / MAX_VALUE, 0, 0.5, 0)
+    jumpRow.Knob.Position = UDim2.new(defaultJump / MAX_VALUE, 0, 0.5, 0)
     applyValues()
 end)
 
@@ -361,20 +408,41 @@ end)
 
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
--- initialize visuals
-speedRow.Value = speedRow.Value or DEFAULT_SPEED
-jumpRow.Value = jumpRow.Value or DEFAULT_JUMP
-speedRow.SavedValue = speedRow.SavedValue or speedRow.Value
-jumpRow.SavedValue = jumpRow.SavedValue or jumpRow.Value
-speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
-jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
-speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
-jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
-speedRow.ValueBox.Text = formatNumber(speedRow.Value)
-jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
-fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
+-- Initialize visuals when character spawns, and capture the game's defaults
+local function onCharacterAdded(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if hum then
+        -- capture game's current defaults
+        GAME_DEFAULT_WALKSPEED = hum.WalkSpeed or GAME_DEFAULT_WALKSPEED
+        GAME_DEFAULT_JUMPPOWER = hum.JumpPower or GAME_DEFAULT_JUMPPOWER
 
--- lightweight loop (interval updated to 0.04)
+        -- initialize sliders to game's defaults if not already changed by user
+        if not speedRow.SavedValue then
+            speedRow.Value = GAME_DEFAULT_WALKSPEED
+            speedRow.SavedValue = GAME_DEFAULT_WALKSPEED
+        end
+        if not jumpRow.SavedValue then
+            jumpRow.Value = GAME_DEFAULT_JUMPPOWER
+            jumpRow.SavedValue = GAME_DEFAULT_JUMPPOWER
+        end
+
+        speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
+        jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
+        speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
+        jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
+        speedRow.ValueBox.Text = formatNumber(speedRow.Value)
+        jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
+        fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
+    end
+    -- make sure toggles (if any in your version) are OFF on death — we only reset sliders here
+end
+
+if player.Character then
+    onCharacterAdded(player.Character)
+end
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- lightweight loop (interval 0.04)
 local running = true
 spawn(function()
     while running and screenGui.Parent do
