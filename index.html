@@ -1,22 +1,23 @@
--- ScriptBlock — Touch + mouse robust dragging | use game's default WalkSpeed & JumpPower | updated invite
+-- ScriptBlock — Fixed: capture game defaults & Revert resets to them
 -- Paste into StarterPlayer > StarterPlayerScripts (replace old LocalScript)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TextService = game:GetService("TextService")
+local ContentProvider = game:GetService("ContentProvider")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- We'll read the game's current defaults from the player's humanoid when available
+-- We'll capture these from the Humanoid on character spawn
 local GAME_DEFAULT_WALKSPEED = 16
 local GAME_DEFAULT_JUMPPOWER = 50
 
 local MAX_VALUE = 1000
 local SNAP = 5
 
--- Updated invite
+-- Updated invite (kept as you asked previously)
 local DISCORD_INVITE = "https://discord.gg/9mTKFv5HR"
 
 -- create ScreenGui
@@ -26,7 +27,7 @@ screenGui.ResetOnSpawn = false
 screenGui.DisplayOrder = 1000
 screenGui.Parent = playerGui
 
--- main UI (visuals preserved)
+-- main UI (unchanged)
 local FRAME_W, FRAME_H = 360, 240
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Name = "MainFrame"
@@ -112,11 +113,13 @@ local function createSliderRow(parent, y, labelText, default)
 
     return {
         Row = row, Label = lbl, ValueBox = valueBox, Track = track,
-        Fill = fill, Knob = knob, Value = default, Dragging = false, SavedValue = default
+        Fill = fill, Knob = knob, Value = default, Dragging = false, SavedValue = default,
+        -- store default placeholder separately (may be replaced later)
+        DefaultPlaceholder = default
     }
 end
 
--- We'll create rows with temporary defaults; they'll be updated to game's defaults when character loads
+-- Create slider rows using placeholder defaults; we'll capture actual game defaults on character spawn
 local speedRow = createSliderRow(controlsFrame, 0, "Speed", GAME_DEFAULT_WALKSPEED)
 local jumpRow = createSliderRow(controlsFrame, 44, "JumpPower", GAME_DEFAULT_JUMPPOWER)
 
@@ -372,23 +375,33 @@ local function applyValues()
     if not jumpRow.ValueBox:IsFocused() then jumpRow.ValueBox.Text = formatNumber(jumpRow.Value); fitTextToBox(jumpRow.ValueBox) end
 end
 
--- Revert: revert to game's defaults (read from GAME_DEFAULT_*)
+-- Revert: reset to the captured game's defaults (not current humanoid values)
 revertBtn.MouseButton1Click:Connect(function()
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local defaultSpeed = hum and hum.WalkSpeed or GAME_DEFAULT_WALKSPEED
-    local defaultJump = hum and hum.JumpPower or GAME_DEFAULT_JUMPPOWER
+    -- use captured game defaults
+    local defaultSpeed = GAME_DEFAULT_WALKSPEED or 16
+    local defaultJump = GAME_DEFAULT_JUMPPOWER or 50
 
-    speedRow.Value = defaultSpeed; jumpRow.Value = defaultJump
-    speedRow.SavedValue = defaultSpeed; jumpRow.SavedValue = defaultJump
+    speedRow.Value = defaultSpeed
+    jumpRow.Value = defaultJump
+    speedRow.SavedValue = defaultSpeed
+    jumpRow.SavedValue = defaultJump
     speedRow.Fill.Size = UDim2.new(defaultSpeed / MAX_VALUE, 0, 1, 0)
     jumpRow.Fill.Size = UDim2.new(defaultJump / MAX_VALUE, 0, 1, 0)
     speedRow.Knob.Position = UDim2.new(defaultSpeed / MAX_VALUE, 0, 0.5, 0)
     jumpRow.Knob.Position = UDim2.new(defaultJump / MAX_VALUE, 0, 0.5, 0)
-    applyValues()
+
+    -- apply to current humanoid immediately if present
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = math.clamp(defaultSpeed, 0, MAX_VALUE)
+            hum.JumpPower = math.clamp(defaultJump, 0, MAX_VALUE)
+        end
+    end
 end)
 
--- minimize behavior (invite hide + sticker move)
+-- Minimize behavior (invite hide + sticker move)
 local minimized = false
 minBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
@@ -409,6 +422,7 @@ end)
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
 -- Initialize visuals when character spawns, and capture the game's defaults
+local defaultsCaptured = false
 local function onCharacterAdded(char)
     local hum = char:WaitForChild("Humanoid", 5)
     if hum then
@@ -416,25 +430,27 @@ local function onCharacterAdded(char)
         GAME_DEFAULT_WALKSPEED = hum.WalkSpeed or GAME_DEFAULT_WALKSPEED
         GAME_DEFAULT_JUMPPOWER = hum.JumpPower or GAME_DEFAULT_JUMPPOWER
 
-        -- initialize sliders to game's defaults if not already changed by user
-        if not speedRow.SavedValue then
+        -- store as slider-specific default markers (used by Revert)
+        speedRow.DefaultStored = GAME_DEFAULT_WALKSPEED
+        jumpRow.DefaultStored = GAME_DEFAULT_JUMPPOWER
+
+        -- On first spawn only, set sliders to game defaults so user sees them immediately
+        if not defaultsCaptured then
+            defaultsCaptured = true
             speedRow.Value = GAME_DEFAULT_WALKSPEED
             speedRow.SavedValue = GAME_DEFAULT_WALKSPEED
-        end
-        if not jumpRow.SavedValue then
             jumpRow.Value = GAME_DEFAULT_JUMPPOWER
             jumpRow.SavedValue = GAME_DEFAULT_JUMPPOWER
-        end
 
-        speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
-        jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
-        speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
-        jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
-        speedRow.ValueBox.Text = formatNumber(speedRow.Value)
-        jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
-        fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
+            speedRow.Fill.Size = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 1, 0)
+            jumpRow.Fill.Size = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 1, 0)
+            speedRow.Knob.Position = UDim2.new((speedRow.Value) / MAX_VALUE, 0, 0.5, 0)
+            jumpRow.Knob.Position = UDim2.new((jumpRow.Value) / MAX_VALUE, 0, 0.5, 0)
+            speedRow.ValueBox.Text = formatNumber(speedRow.Value)
+            jumpRow.ValueBox.Text = formatNumber(jumpRow.Value)
+            fitTextToBox(speedRow.ValueBox); fitTextToBox(jumpRow.ValueBox)
+        end
     end
-    -- make sure toggles (if any in your version) are OFF on death — we only reset sliders here
 end
 
 if player.Character then
