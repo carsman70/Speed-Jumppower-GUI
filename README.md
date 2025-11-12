@@ -5,7 +5,7 @@ Source code is proprietary and not included.
 
 License: Restricted Use — Non-Redistribution (2025). See LICENSE file.
 Owner: ScriptBlock (carsman70)
-Contact: ScriptBlock (carsman70)
+Contact: ScriptBlock (carsman70) — ScriptBlock@outlook.com.au
 
 # Speed-Jumppower-GUI
 
